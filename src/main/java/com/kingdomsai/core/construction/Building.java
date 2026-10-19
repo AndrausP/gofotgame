@@ -67,6 +67,7 @@ public final class Building {
     public boolean overlaps(Pos otherOrigin, Blueprint other, int margin) {
         Blueprint b = blueprint();
         if (b == null) return false;
+        if (RoadPlannerSource.is(b) || RoadPlannerSource.is(other)) return false; // estradas passam por tudo (o A* já desvia das obras)
         int ax0 = origin.x() - margin, ax1 = origin.x() + b.sizeX() + margin;
         int az0 = origin.z() - margin, az1 = origin.z() + b.sizeZ() + margin;
         int bx0 = otherOrigin.x(), bx1 = otherOrigin.x() + other.sizeX();
@@ -96,5 +97,11 @@ public final class Building {
         if (b == null) return 0;
         int total = b.solidTotal();
         return total == 0 ? 100.0 * progress / Math.max(1, b.blockCount()) : 100.0 * b.solidBefore(progress) / total;
+    }
+}
+
+final class RoadPlannerSource {
+    static boolean is(Blueprint b) {
+        return b != null && "road".equals(b.source());
     }
 }

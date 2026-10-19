@@ -145,14 +145,11 @@ public final class DialogueService {
         Npc adv = core.advisor().advisorNpc(k);
         if (handlePending(playerId, adv != null ? adv.name + " (Conselheiro)" : "Conselho", text, callback)) return;
         if (Text.norm(text).matches(".*muralha.*(arqueir|soldad|guarni|reserva|portoes).*")) { // ordem militar composta (plano-padrão; passos validados)
-            try {
-                var plan = core.militaryOrders().submit(k, playerId, com.kingdomsai.core.military.MilitaryOrders.defaultPlanJson());
+            core.militaryOrders().design(k, playerId, text, plan -> {
                 List<String> lines = new ArrayList<>();
                 for (var st : plan.steps) lines.add("• " + st.id + " " + st.type + (st.after.isEmpty() ? "" : " (depois de " + String.join(",", st.after) + ")") + ": " + st.status);
-                callback.accept(new Reply(adv != null ? adv.name + " (Conselheiro)" : "Conselho", "Plano militar em andamento, Majestade.", lines, "regras", false, ""));
-            } catch (IllegalArgumentException e) {
-                callback.accept(new Reply("Conselho", "Não foi possível.", List.of("✗ " + e.getMessage()), "regras", false, ""));
-            }
+                callback.accept(new Reply(adv != null ? adv.name + " (Conselheiro)" : "Conselho", "Plano militar em andamento, Majestade.", lines, core.llm().live() ? "LLM" : "regras", false, ""));
+            }, err -> callback.accept(new Reply("Conselho", "Não foi possível.", List.of("✗ " + err), "regras", false, "")));
             return;
         }
         if (com.kingdomsai.core.construction.program.DefaultPrograms.isProgramRequest(text)) {

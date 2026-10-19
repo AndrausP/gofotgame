@@ -278,7 +278,7 @@ flowchart TD
 
 ---
 
-### F5 — Arquiteto: ordens de construção em linguagem natural — **Feita em parte** (F5.1–F5.3 completas; F5.4 só `watchtowers`; `wall_ring` de território, `road` e lotes ficaram pendentes — a muralha da vila já existia)
+### F5 — Arquiteto: ordens de construção em linguagem natural — **Feita** (programa, compilador, arquiteto, watchtowers, estrada em lotes, wall_ring = anel da vila)
 
 **Objetivo:** "Construa uma catedral gótica com duas torres frontais, nave central, vitrais, contrafortes e claustro" vira obra real, sem uma função por edifício.
 
@@ -308,7 +308,7 @@ flowchart TD
 
 ---
 
-### F6 — Ordens militares compostas — **Feita em parte** (DEFEND como guarnição via MOVE, executor de dependências `MilitaryOrders` com plano-padrão; pendentes: LLM `military`, força de reação e replanejamento/reparo por regra)
+### F6 — Ordens militares compostas — **Feita** (DEFEND, MilitaryOrders com LLM, reação, reparo, reabastecimento)
 
 **Objetivo:** "Construa uma muralha ao redor do reino, ponha arqueiros nas torres, soldados nos portões e uma força de reação" vira um plano executável.
 

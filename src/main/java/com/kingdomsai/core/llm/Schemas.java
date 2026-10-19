@@ -26,6 +26,7 @@ public final class Schemas {
     public static String forPurpose(String purpose, boolean canPropose) {
         if ("rival_king".equals(purpose)) return rivalKing(canPropose);
         if ("architect".equals(purpose)) return architect();
+        if ("military".equals(purpose)) return military();
         List<String> types = switch (purpose == null ? "" : purpose) {
             case "agenda" -> List.of("LIFE");
             case "conversa" -> List.of("LINE");
@@ -39,6 +40,41 @@ public final class Schemas {
     public static final List<String> RIVAL_ACTIONS = List.of("NEGOTIATE", "GIVE", "DECLARE_WAR", "MAKE_PEACE", "RECRUIT", "TAX");
     public static final List<String> RIVAL_STANCES = List.of("aggressive", "defensive", "mercantile", "isolationist");
     public static final List<String> RIVAL_DECISIONS = List.of("aceitar", "recusar", "contraproposta", "ignorar", "declarar_guerra", "pedir_paz", "reforcar", "nenhuma");
+
+    /** Plano militar: lista de passos com dependências (validada em MilitaryOrders.parse). */
+    public static String military() {
+        JsonObject str = new JsonObject();
+        str.addProperty("type", "string");
+        JsonObject type = new JsonObject();
+        type.addProperty("type", "string");
+        type.add("enum", strings("BUILD", "RECRUIT", "TRAIN", "DEFEND", "PATROL"));
+        JsonObject params = new JsonObject();
+        params.addProperty("type", "object");
+        JsonObject after = new JsonObject();
+        after.addProperty("type", "array");
+        after.add("items", str);
+        JsonObject props = new JsonObject();
+        props.add("id", str);
+        props.add("type", type);
+        props.add("params", params);
+        props.add("after", after);
+        JsonObject step = new JsonObject();
+        step.addProperty("type", "object");
+        step.add("properties", props);
+        step.add("required", strings("id", "type"));
+        JsonObject plan = new JsonObject();
+        plan.addProperty("type", "array");
+        plan.addProperty("maxItems", 12);
+        plan.add("items", step);
+        JsonObject rp = new JsonObject();
+        rp.add("plan", plan);
+        rp.add("reason", str);
+        JsonObject root = new JsonObject();
+        root.addProperty("type", "object");
+        root.add("properties", rp);
+        root.add("required", strings("plan"));
+        return root.toString();
+    }
 
     /** Programa arquitetônico (módulos validados depois pelo compilador). */
     public static String architect() {

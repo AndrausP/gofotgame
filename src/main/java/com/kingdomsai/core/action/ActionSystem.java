@@ -183,6 +183,15 @@ public final class ActionSystem {
     }
 
     private ActionResult buildProgram(Kingdom k, ActionRequest r) {
+        if (Validators.isRoad(r)) {
+            var from = Validators.place(core, k, r, r.param("from") == null ? "praca" : r.param("from"));
+            var to = Validators.place(core, k, r, r.param("to"));
+            if (from.error() != null) return ActionResult.reject("invalid_target", from.error());
+            if (to.error() != null) return ActionResult.reject("invalid_target", to.error());
+            var lots = com.kingdomsai.core.construction.program.RoadPlanner.build(core, k, from.pos(), to.pos());
+            return lots.isEmpty() ? ActionResult.reject("no_site", "Sem caminho livre (ou sem pedra) para a estrada.")
+                    : ActionResult.ok("Estrada em " + lots.size() + " lote(s): vários construtores trabalham juntos.");
+        }
         if (Validators.isWatchtowers(r)) {
             var made = core.architect().watchtowers(k, Math.max(1, r.intParam("amount", 4)));
             return made.isEmpty() ? ActionResult.reject("no_site", "Não achei pontos altos livres na fronteira para torres de vigia.")

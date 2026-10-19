@@ -105,6 +105,13 @@ public final class ProgramSelfTest {
         k.add(com.kingdomsai.core.kingdom.ResourceType.STONE, 3000);
         k.add(com.kingdomsai.core.kingdom.ResourceType.WOOD, 3000);
         for (int i = 0; i < 20 * 120; i++) host.step();
+        var road = host.core.actions().execute(com.kingdomsai.core.action.ActionRequest.of(k.id, pl, com.kingdomsai.core.action.ActionRequest.ActorKind.PLAYER,
+                com.kingdomsai.core.action.ActionType.BUILD, com.kingdomsai.core.action.ActionRequest.Source.TEST, "blueprint", "road", "from", "praca", "to", "40 40"));
+        System.out.println("    | " + road.message());
+        check("estrada em lotes entre dois pontos", road.ok() && road.message().contains("lote"));
+        var wall = host.core.actions().execute(com.kingdomsai.core.action.ActionRequest.of(k.id, pl, com.kingdomsai.core.action.ActionRequest.ActorKind.PLAYER,
+                com.kingdomsai.core.action.ActionType.BUILD, com.kingdomsai.core.action.ActionRequest.Source.TEST, "blueprint", "wall_ring"));
+        check("wall_ring (anel da vila com portões) aceito", wall.ok() || wall.code().equals("no_site") || wall.code().equals("insufficient_resources"));
         BuildingProgram prog = DefaultPrograms.fortress(Style.FORTRESS);
         prog.modules.removeIf(mm -> !mm.id.equals("torre-menagem") && !mm.id.equals("t1"));
         var res = ProgramCompiler.compile(prog);

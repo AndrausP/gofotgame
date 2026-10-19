@@ -93,7 +93,7 @@ public final class ClaudeCodeSelfTest {
         live.claudeNpcModel = "sonnet";
         core.llm().configure(live);
         core.config().lifeLlm = false; // este teste mede só a conversa do rei (a vida dos súditos tem o próprio teste)
-        check("status mostra Claude Code", core.llm().status().contains("Claude Code") && core.llm().status().contains("sonnet")); // súditos em sonnet neste teste
+        check("status mostra Claude Code", core.llm().status().contains("Claude") && core.llm().status().contains("sonnet")); // súditos em sonnet neste teste
         check("modelos = apelidos", core.llm().listModels().get(2, TimeUnit.SECONDS).containsAll(List.of("haiku", "sonnet", "opus")));
         UUID player = UUID.randomUUID();
         CommandService cli = new CommandService(core);

@@ -149,7 +149,11 @@ public final class Validators {
 
     /** BUILD blueprint=program: obra composta pelo arquiteto (catedral, mosteiro, fortaleza). */
     public static boolean isProgram(ActionRequest r) {
-        return r.type() == ActionType.BUILD && ("program".equalsIgnoreCase(r.param("blueprint")) || isWatchtowers(r));
+        return r.type() == ActionType.BUILD && ("program".equalsIgnoreCase(r.param("blueprint")) || isWatchtowers(r) || isRoad(r));
+    }
+
+    public static boolean isRoad(ActionRequest r) {
+        return r.type() == ActionType.BUILD && "road".equalsIgnoreCase(r.param("blueprint"));
     }
 
     public static boolean isWatchtowers(ActionRequest r) {
@@ -675,6 +679,10 @@ public final class Validators {
         int amount = r.intParam("amount", 1);
         switch (r.type()) {
             case BUILD -> {
+                if (isRoad(r)) {
+                    c.put(ResourceType.STONE, 10);
+                    break;
+                }
                 if (isWatchtowers(r)) {
                     c.put(ResourceType.STONE, 40 * Math.max(1, r.intParam("amount", 4)));
                     break;
