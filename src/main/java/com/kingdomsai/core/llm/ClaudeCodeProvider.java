@@ -49,11 +49,31 @@ public final class ClaudeCodeProvider implements LlmProvider {
 
     public static final Launcher SYSTEM = (command, dir) -> new ProcessBuilder(command).directory(dir.toFile()).start();
 
-    private static final ExecutorService POOL = Executors.newFixedThreadPool(2, r -> {
+    /** Quem limita a concorrência é a fila do LlmGateway (maxConcurrentCalls); aqui só há threads sob demanda. */
+    private static final ExecutorService POOL = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "KingdomsAI-ClaudeCode");
         t.setDaemon(true);
         return t;
     });
+    /** Processos do CLI em andamento: se a ponte fechar no meio de uma pergunta, nenhum fica vivo. */
+    private static final java.util.Set<Process> LIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    static {
+        Runtime.getRuntime().addShutdownHook(new Thread(ClaudeCodeProvider::killAll, "KingdomsAI-ClaudeCode-shutdown"));
+    }
+
+    /** Encerra todos os processos do Claude Code que este jogo abriu (também no desligamento da JVM). */
+    public static void killAll() {
+        for (Process p : LIVE.toArray(new Process[0])) {
+            kill(p);
+            LIVE.remove(p);
+        }
+    }
+
+    /** Quantos processos do CLI estão em andamento agora (testes). */
+    public static int liveProcesses() {
+        return LIVE.size();
+    }
     private static final ExecutorService PIPES = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "KingdomsAI-ClaudeCode-io");
         t.setDaemon(true);
@@ -109,6 +129,7 @@ public final class ClaudeCodeProvider implements LlmProvider {
             long t0 = System.currentTimeMillis();
             try {
                 p = launcher.start(cmd, workDir);
+                LIVE.add(p);
             } catch (IOException e) {
                 throw new IllegalStateException(notFound(cfg), e);
             }
@@ -139,6 +160,7 @@ public final class ClaudeCodeProvider implements LlmProvider {
         } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
             throw new IllegalStateException("Claude Code: saída incompleta (" + e.getClass().getSimpleName() + ")", e);
         } finally {
+            if (p != null) LIVE.remove(p);
             if (systemFile != null) try {
                 Files.deleteIfExists(systemFile);
             } catch (IOException ignored) {

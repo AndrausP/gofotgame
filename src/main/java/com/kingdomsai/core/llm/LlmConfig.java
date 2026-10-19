@@ -18,6 +18,8 @@ public final class LlmConfig {
     public int timeoutMs = 15000;
     public int maxRetries = 2;
     public int maxCallsPerMinute = 20;
+    /** Chamadas ao modelo em andamento ao mesmo tempo (o resto espera na fila com prioridade). */
+    public int maxConcurrentCalls = 3;
     /** Se a LLM falhar, usa o interpretador por regras (o jogo nunca congela). */
     public boolean fallbackToRules = true;
     /** claude_code: o executável do Claude Code (claude, claude.exe, claude.cmd ou o caminho completo). */
@@ -88,6 +90,7 @@ public final class LlmConfig {
         c.timeoutMs = timeoutMs;
         c.maxRetries = maxRetries;
         c.maxCallsPerMinute = maxCallsPerMinute;
+        c.maxConcurrentCalls = maxConcurrentCalls;
         c.fallbackToRules = fallbackToRules;
         c.claudeCommand = claudeCommand;
         c.claudeNpcModel = claudeNpcModel;

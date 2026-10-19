@@ -105,8 +105,9 @@ public final class ContextBuilder {
         boolean ownSubject = playerKingdom != null && playerKingdom.id.equals(npc.kingdomId);
         StringBuilder sys = new StringBuilder();
         sys.append("=== SYSTEM RULES ===\n");
-        sys.append("Você interpreta ").append(sanitize(npc.name)).append(", ").append(npc.title().toLowerCase())
-                .append(" de ").append(npcKingdom == null ? "lugar nenhum" : sanitize(npcKingdom.name)).append(", num reino medieval ").append(core.config().hostWorldPhrase()).append(".\n");
+        // Prompt de sistema ESTÁTICO (só muda com o tipo de interlocutor): o que varia por súdito vai para WORLD DATA.
+        // Assim o prefixo é igual entre chamadas e o cache de prompt do provider é reaproveitado.
+        sys.append("Você interpreta o personagem descrito em WORLD DATA (campo Você é), num reino medieval ").append(core.config().hostWorldPhrase()).append(".\n");
         sys.append(ownSubject ? "Quem fala com você é o SEU rei.\n" : "Quem fala com você é o rei de um reino ESTRANGEIRO; você não obedece ordens dele.\n");
         sys.append("Fale em português, em primeira pessoa, com a personalidade descrita. Seja breve.\n");
         sys.append(OUTPUT_RULES);
@@ -115,6 +116,8 @@ public final class ContextBuilder {
 
         StringBuilder user = new StringBuilder();
         user.append("=== WORLD DATA ===\n");
+        user.append("Você é: ").append(sanitize(npc.name)).append(", ").append(npc.title().toLowerCase())
+                .append(" de ").append(npcKingdom == null ? "lugar nenhum" : sanitize(npcKingdom.name)).append(".\n");
         user.append("Personagem: ").append(npc.personalitySummary()).append('\n');
         user.append("Profissão: ").append(npc.profession.display).append(". Cargo: ").append(npc.office.display)
                 .append(". Lealdade ao rei: ").append(npc.loyalty).append("/100. Fama: ").append(npc.fame).append(".\n");
@@ -162,10 +165,11 @@ public final class ContextBuilder {
     /** Ordem/pergunta ao conselho (CLI "kingdom order" / "ai ask" / caixa de texto do Manager). */
     public LlmRequest councilOrder(Kingdom k, String playerText) {
         Npc advisor = core.advisor().advisorNpc(k);
-        String sys = "=== SYSTEM RULES ===\nVocê é " + (advisor != null ? advisor.name + ", conselheiro" : "o conselho real")
-                + " de " + sanitize(k.name) + ". Interprete ordens do rei em ações do jogo e responda perguntas com base nos dados.\n"
+        // Estático por finalidade (cache de prompt): quem é o conselheiro e o nome do reino vão para WORLD DATA.
+        String sys = "=== SYSTEM RULES ===\nVocê é o conselheiro do reino descrito em WORLD DATA. Interprete ordens do rei em ações do jogo e responda perguntas com base nos dados.\n"
                 + OUTPUT_RULES + actionCatalog();
         StringBuilder user = new StringBuilder("=== WORLD DATA ===\n");
+        user.append("Você é: ").append(advisor != null ? sanitize(advisor.name) + ", conselheiro" : "o conselho real").append(" de ").append(sanitize(k.name)).append(".\n");
         for (String f : core.advisor().facts(k)) user.append(f).append('\n');
         user.append(com.kingdomsai.core.construction.VillageWall.describe(core, k)).append('\n');
         user.append(markersLine(k));

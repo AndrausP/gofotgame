@@ -3,6 +3,9 @@ package com.kingdomsai.core.llm;
 import com.kingdomsai.core.KingdomsCore;
 
 import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +30,153 @@ public final class LlmGateway {
     private volatile String lastResponse = "";
     private final LlmLedger ledger = new LlmLedger();
     private volatile boolean budgetNoticeSent;
+
+    // ---- fila única com prioridade (F3.4)
+    private final Object lock = new Object();
+    private final PriorityQueue<Job> queue = new PriorityQueue<>();
+    private final Map<String, Job> byKey = new HashMap<>();
+    private int inFlight;
+    private long seq;
+    private volatile int fused, staleDropped;
+
+    /** Resposta descartada porque o mundo andou enquanto o pedido esperava na fila. */
+    static final class StaleRequestException extends RuntimeException {
+        StaleRequestException() {
+            super("pedido vencido", null, false, false);
+        }
+    }
+
+    private static final class Job implements Comparable<Job> {
+        final int priority;
+        final long seq, createdTick;
+        final LlmRequest req;
+        final LlmConfig cfg;
+        final String key;
+        final CompletableFuture<ProviderResult> future = new CompletableFuture<>();
+
+        Job(int priority, long seq, long createdTick, LlmRequest req, LlmConfig cfg, String key) {
+            this.priority = priority;
+            this.seq = seq;
+            this.createdTick = createdTick;
+            this.req = req;
+            this.cfg = cfg;
+            this.key = key;
+        }
+
+        @Override
+        public int compareTo(Job o) {
+            return priority != o.priority ? Integer.compare(priority, o.priority) : Long.compare(seq, o.seq);
+        }
+    }
+
+    /** Prioridade (menor = primeiro): fala do rei > conselho/rival > arquiteto > agenda > conversa entre súditos. */
+    public static int priorityOf(String purpose) {
+        if (purpose == null) return 2;
+        return switch (purpose) {
+            case "npc_dialogue", "test" -> 0;
+            case "council", "rival_king", "military", "repair" -> 1;
+            case "architect" -> 2;
+            case "agenda" -> 3;
+            case "conversa" -> 4;
+            default -> 2;
+        };
+    }
+
+    /** Quantos ticks um pedido de fundo pode esperar na fila antes de perder o sentido (0 = nunca vence). */
+    public static long maxAgeTicks(String purpose) {
+        if (purpose == null) return 0;
+        return switch (purpose) {
+            case "agenda" -> 20L * 90;
+            case "conversa" -> 20L * 12;
+            default -> 0;
+        };
+    }
+
+    public int fusedRequests() {
+        return fused;
+    }
+
+    public int staleDropped() {
+        return staleDropped;
+    }
+
+    /**
+     * Entra na fila única. Pedidos de fundo com a mesma chave (finalidade + NPC) ainda pendentes ou em andamento são fundidos
+     * (todos recebem a mesma resposta); pedidos que esperam além do tempo de vida da finalidade são descartados sem chamar o provider.
+     */
+    private CompletableFuture<ProviderResult> dispatch(LlmRequest req, boolean dedupe) {
+        String key = dedupe && req.npcId() != null ? req.purpose() + ":" + req.npcId() : null;
+        CompletableFuture<ProviderResult> result;
+        synchronized (lock) {
+            if (key != null) {
+                Job existing = byKey.get(key);
+                if (existing != null) {
+                    fused++;
+                    return existing.future;
+                }
+            }
+            Job job = new Job(priorityOf(req.purpose()), seq++, core.tick(), req, config, key);
+            queue.add(job);
+            if (key != null) byKey.put(key, job);
+            result = job.future;
+        }
+        pump();
+        return result;
+    }
+
+    /** Dispara o que cabe na concorrência configurada; descarta o que venceu na fila. */
+    private void pump() {
+        java.util.List<Job> start = new java.util.ArrayList<>();
+        java.util.List<Job> stale = new java.util.ArrayList<>();
+        synchronized (lock) {
+            // vencidos saem da fila já (não esperam a vez para descobrir que perderam o sentido)
+            for (java.util.Iterator<Job> it = queue.iterator(); it.hasNext(); ) {
+                Job j = it.next();
+                long maxAge = maxAgeTicks(j.req.purpose());
+                if (maxAge > 0 && core.tick() - j.createdTick > maxAge) {
+                    it.remove();
+                    if (j.key != null) byKey.remove(j.key);
+                    staleDropped++;
+                    ledger.recordStale(j.req.purpose());
+                    stale.add(j);
+                }
+            }
+            while (inFlight < Math.max(1, config.maxConcurrentCalls) && !queue.isEmpty()) {
+                inFlight++;
+                start.add(queue.poll());
+            }
+        }
+        for (Job j : stale) j.future.completeExceptionally(new StaleRequestException());
+        for (Job j : start) run(j);
+    }
+
+    private void run(Job j) {
+        long t0 = System.currentTimeMillis();
+        CompletableFuture<ProviderResult> call;
+        try {
+            call = provider.completeDetailed(j.req, j.cfg).orTimeout(j.cfg.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS);
+        } catch (RuntimeException e) {
+            call = CompletableFuture.failedFuture(e);
+        }
+        call.whenComplete((res, err) -> {
+            synchronized (lock) {
+                inFlight--;
+                if (j.key != null) byKey.remove(j.key);
+            }
+            long ms = System.currentTimeMillis() - t0;
+            if (err != null) {
+                ledger.recordError(j.req.purpose(), ms);
+                j.future.completeExceptionally(err);
+            } else {
+                ProviderResult.Usage u = res.usage();
+                ProviderResult timed = u.latencyMs() > 0 ? res : new ProviderResult(res.text(), new ProviderResult.Usage(u.costUsd(), u.inputTokens(),
+                        u.outputTokens(), u.cacheReadTokens(), u.cacheCreationTokens(), ms, u.model()));
+                record(j.req.purpose(), timed); // uma vez por chamada real, mesmo com pedidos fundidos
+                j.future.complete(timed);
+            }
+            pump();
+        });
+    }
 
     public LlmGateway(KingdomsCore core) {
         this.core = core;
@@ -91,10 +241,9 @@ public final class LlmGateway {
         long t0 = System.currentTimeMillis();
         LlmRequest req = new LlmRequest("test", "Responda apenas com JSON.", "Responda exatamente: {\"reply\":\"ok\",\"actions\":[]}",
                 null, null, "teste");
-        return provider.completeDetailed(req, config).orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS).handle((res, err) -> {
+        return dispatch(req, false).handle((res, err) -> {
             long ms = System.currentTimeMillis() - t0;
             String raw = res == null ? "" : res.text();
-            if (res != null) record(req.purpose(), res, ms);
             if (err != null) {
                 Throwable c = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
                 return "✗ Falhou em " + ms + " ms: " + (c instanceof TimeoutException ? "timeout" : c.getMessage());
@@ -141,14 +290,8 @@ public final class LlmGateway {
         while (!calls.isEmpty() && now - calls.peekFirst() > 60_000) calls.pollFirst();
         if (calls.size() >= Math.max(1, config.maxCallsPerMinute - 5)) return CompletableFuture.completedFuture(null);
         calls.addLast(now);
-        long t0 = now;
-        return provider.completeDetailed(req, config).orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS).handle((res, err) -> {
-            long ms = System.currentTimeMillis() - t0;
-            if (err != null) {
-                ledger.recordError(req.purpose(), ms);
-                return null;
-            }
-            record(req.purpose(), res, ms);
+        return dispatch(req, true).handle((res, err) -> {
+            if (err != null) return null; // falha ou pedido vencido: quem chamou segue pelas regras
             try {
                 return Plan.parse(res.text());
             } catch (RuntimeException e) {
@@ -175,14 +318,10 @@ public final class LlmGateway {
     private CompletableFuture<Result> attempt(LlmRequest req, int tryNo) {
         LlmRequest effective = tryNo == 0 ? req
                 : req.withUser(req.user() + "\n\nATENÇÃO: sua resposta anterior não era JSON válido. Responda SOMENTE o objeto JSON.");
-        long t0 = System.currentTimeMillis();
-        return provider.completeDetailed(effective, config)
-                .orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS)
+        return dispatch(effective, false)
                 .handle((res, err) -> {
-                    long ms = System.currentTimeMillis() - t0;
                     String raw = res == null ? null : res.text();
                     if (err != null) {
-                        ledger.recordError(req.purpose(), ms);
                         Throwable cause = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
                         lastError = cause instanceof TimeoutException ? "timeout"
                                 : cause instanceof IllegalStateException ? cause.getMessage() : cause.getClass().getSimpleName() + ": " + cause.getMessage();
@@ -190,7 +329,6 @@ public final class LlmGateway {
                         return fallback(req, lastError);
                     }
                     lastResponse = raw;
-                    record(req.purpose(), res, ms);
                     try {
                         Plan p = Plan.parse(raw);
                         lastError = "";
@@ -203,10 +341,8 @@ public final class LlmGateway {
                 }).thenCompose(f -> f);
     }
 
-    private void record(String purpose, ProviderResult res, long wallMs) {
-        ProviderResult.Usage u = res.usage();
-        ledger.record(purpose, u.latencyMs() > 0 ? u : new ProviderResult.Usage(u.costUsd(), u.inputTokens(), u.outputTokens(),
-                u.cacheReadTokens(), u.cacheCreationTokens(), wallMs, u.model()));
+    private void record(String purpose, ProviderResult res) {
+        ledger.record(purpose, res.usage());
         core.state().aiSpentUsd = ledger.totalCostUsd();
         core.state().aiCalls = ledger.totalCalls();
     }

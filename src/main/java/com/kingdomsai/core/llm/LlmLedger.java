@@ -13,7 +13,7 @@ import java.util.TreeMap;
 public final class LlmLedger {
     /** Totais de uma finalidade. */
     public static final class Entry {
-        public int calls, fallbacks, errors;
+        public int calls, fallbacks, errors, stale;
         public double costUsd;
         public long inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, latencyMs;
         /** Chamadas cujo custo o provider informou (a média de custo usa só estas). */
@@ -33,6 +33,7 @@ public final class LlmLedger {
             e.calls = calls;
             e.fallbacks = fallbacks;
             e.errors = errors;
+            e.stale = stale;
             e.costUsd = costUsd;
             e.inputTokens = inputTokens;
             e.outputTokens = outputTokens;
@@ -71,6 +72,11 @@ public final class LlmLedger {
         e.calls++;
         e.errors++;
         e.latencyMs += latencyMs;
+    }
+
+    /** O pedido venceu na fila e foi descartado sem chamar o provider. */
+    public synchronized void recordStale(String purpose) {
+        of(purpose).stale++;
     }
 
     /** O pedido caiu para as regras. */
@@ -115,8 +121,8 @@ public final class LlmLedger {
                 budgetUsd > 0 ? String.format(Locale.ROOT, " de US$ %.2f", budgetUsd) : " (sem teto)", fallbacks));
         for (var en : snap.entrySet()) {
             Entry e = en.getValue();
-            out.add(String.format(Locale.ROOT, "  %-13s %3d chamadas · US$ %.4f · %.1f s médios · %d falha(s) · %d via regras · tokens %d/%d (cache lido %d)",
-                    en.getKey(), e.calls, e.costUsd, e.avgLatencyMs() / 1000, e.errors, e.fallbacks, e.inputTokens, e.outputTokens, e.cacheReadTokens));
+            out.add(String.format(Locale.ROOT, "  %-13s %3d chamadas · US$ %.4f · %.1f s médios · %d falha(s) · %d via regras · %d vencida(s) · tokens %d/%d (cache lido %d)",
+                    en.getKey(), e.calls, e.costUsd, e.avgLatencyMs() / 1000, e.errors, e.fallbacks, e.stale, e.inputTokens, e.outputTokens, e.cacheReadTokens));
         }
         out.add("Com login de assinatura o valor é a estimativa do cliente; o que limita de fato é a cota do plano. Com chave de API é cobrança real.");
         return out;
