@@ -1,0 +1,102 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+// Só core + bridge + voxel entram na ponte. Os recursos do mod de Minecraft não vão para o jar.
+sourceSets {
+    main {
+        resources {
+            srcDirs = []
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+    options.compilerArgs << '-nowarn'
+}
+
+// Os testes são classes main() (*SelfTest), não JUnit. Rodam a partir da raiz do projeto (caminhos relativos).
+sourceSets {
+    test {
+        java {
+            exclude 'com/kingdomsai/live/**'
+        }
+    }
+    live {
+        java {
+            srcDir 'src/test/java'
+            include 'com/kingdomsai/live/**'
+        }
+        compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+def testSeed = providers.gradleProperty('seed').orElse('2').get()
+def testRuntime = sourceSets.test.runtimeClasspath + sourceSets.main.runtimeClasspath
+
+def selfTest = { String taskName, String mainClassName, String desc ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        description = desc
+        classpath = testRuntime
+        mainClass = mainClassName
+        workingDir = projectDir
+        jvmArgs '-Dstdout.encoding=UTF-8'
+        // Semente fixa: a suíte é reproduzível. Outra semente: -Pseed=N; sorteada a cada execução: -Pseed=random
+        if (testSeed != 'random') jvmArgs "-Dkingdoms.seed=$testSeed"
+        dependsOn tasks.named('testClasses')
+    }
+}
+
+selfTest('coreTest', 'com.kingdomsai.core.CoreSelfTest', 'Suíte do Core (sociedade, economia, LLM, ordens...)')
+selfTest('voxelTest', 'com.kingdomsai.core.VoxelSuite', 'Suíte voxel: mundo, save, leis e ponte pela rede')
+
+tasks.named('test') {
+    enabled = false
+    dependsOn 'coreTest', 'voxelTest'
+}
+
+tasks.register('liveCheck', JavaExec) {
+    group = 'verification'
+    description = 'Verificações manuais com LLM/CPU reais (LlmLiveCheck). Passe a classe com -PliveClass=...'
+    classpath = sourceSets.live.runtimeClasspath
+    mainClass = providers.gradleProperty('liveClass').orElse('com.kingdomsai.live.LlmLiveCheck')
+    workingDir = projectDir
+    jvmArgs '-Dstdout.encoding=UTF-8'
+    standardInput = System.in
+}
+
+tasks.register('runBridge', JavaExec) {
+    group = 'application'
+    description = 'Sobe a ponte. Ex.: ./gradlew runBridge --args="--llm mock --port 7777"'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.kingdomsai.bridge.BridgeMain'
+    workingDir = projectDir
+    jvmArgs '-Dstdout.encoding=UTF-8'
+    standardInput = System.in
+}
+
+tasks.register('bridgeJar', Jar) {
+    group = 'build'
+    description = 'Jar executável da ponte, com gson embutido'
+    archiveBaseName = 'kingdoms-bridge'
+    destinationDirectory = layout.buildDirectory.dir('bridge')
+    manifest {
+        attributes 'Main-Class': 'com.kingdomsai.bridge.BridgeMain'
+    }
+    from sourceSets.main.output
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
