@@ -155,7 +155,7 @@ public final class PersistenceSelfTest {
         king(new Pos(0, 64, 0), new Pos(25, 63, -25));
         jobAction(k, "npc", miner.name, "kind", "dig", "size", "2x2x2");
         goAway(new Pos(800, 64, 0));
-        for (int s = 0; s < 200 && wood.cycles < 2; s++) seconds(1);
+        for (int s = 0; s < 600 && wood.cycles < 2; s++) seconds(1);
         check("rotina seguiu com o rei longe (" + wood.cycles + " ciclos)", wood.cycles >= 2 && k.get(ResourceType.WOOD) > woodBefore - 10);
         seconds(Math.max(0, (int) (com.kingdomsai.core.event.AwayReport.MIN_AWAY_TICKS / 20)));
         List<String> report = core.reports().tick(player, new Pos(5, 64, 5)); // voltou

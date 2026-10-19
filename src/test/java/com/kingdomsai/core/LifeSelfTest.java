@@ -239,14 +239,16 @@ public final class LifeSelfTest {
         r1.relationTo(r2.id).rivalry = 90;
         r1.traits.put(Trait.AGGRESSION, 85);
         int argBefore = core.life().arguments();
-        for (int i = 0; i < 40 && core.life().arguments() == argBefore; i++) {
+        // o contador e o log são do reino todo (outros pares também brigam): conta só a briga DESTE par, pela memória de r2 sobre r1
+        java.util.function.Predicate<Memory> brawlWithR1 = m -> r1.id.equals(m.about()) && m.text().contains("veio brigar comigo");
+        for (int i = 0; i < 40 && r2.memories.stream().noneMatch(brawlWithR1); i++) {
             r1.relationTo(r2.id).rivalry = 90;
             place(r1, k.center.offset(6, 0, -6));
             place(r2, k.center.offset(7, 0, -6));
             core.life().start(r1, r2, core.tick());
             seconds(40);
         }
-        check("rivais discutem (briga registrada e lembrada)", core.life().arguments() > argBefore && r2.memories.stream().anyMatch(m -> m.text().contains("brigar"))
+        check("rivais discutem (briga registrada e lembrada)", core.life().arguments() > argBefore && r2.memories.stream().anyMatch(brawlWithR1)
                 && core.bus().log().recent(50, e -> e.type() == EventType.NPC_ARGUMENT).size() > 0);
 
         // --- 8. namoro → casal → moram juntos

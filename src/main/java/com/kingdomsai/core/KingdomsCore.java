@@ -253,7 +253,7 @@ public final class KingdomsCore {
     public Kingdom foundKingdom(String name, UUID rulerPlayer, String rulerName, Pos center, KingdomPersonality personality,
                                 int citizens) {
         Kingdom k = new Kingdom();
-        k.id = UUID.randomUUID();
+        k.id = com.kingdomsai.core.common.Ids.next();
         k.name = name;
         k.rulerPlayer = rulerPlayer;
         k.rulerName = rulerName;
@@ -306,7 +306,7 @@ public final class KingdomsCore {
 
     public Npc createNpc(Kingdom k, Profession profession, Pos pos) {
         Npc n = new Npc();
-        n.id = UUID.randomUUID();
+        n.id = com.kingdomsai.core.common.Ids.next();
         n.female = rng.nextBoolean();
         Set<String> taken = state.npcs.values().stream().map(x -> x.name.toLowerCase()).collect(Collectors.toSet());
         n.name = NameGenerator.person(rng, n.female, taken);

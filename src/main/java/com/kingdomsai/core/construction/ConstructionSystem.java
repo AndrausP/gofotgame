@@ -60,7 +60,7 @@ public final class ConstructionSystem {
     private Building create(Kingdom k, Blueprint bp, Pos origin) {
         int y = origin.y();
         Building b = new Building();
-        b.id = UUID.randomUUID();
+        b.id = com.kingdomsai.core.common.Ids.next();
         b.kingdomId = k.id;
         b.blueprintId = bp.id();
         b.origin = new Pos(origin.x(), y, origin.z());

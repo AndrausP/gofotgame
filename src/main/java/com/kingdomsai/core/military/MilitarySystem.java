@@ -181,7 +181,7 @@ public final class MilitarySystem {
     public Campaign launch(Kingdom k, Campaign.Kind kind, Npc commander, List<Npc> people, Kingdom owner, Pos target, boolean noQuarter,
                            boolean surprise, String order) {
         Campaign c = new Campaign();
-        c.id = UUID.randomUUID();
+        c.id = com.kingdomsai.core.common.Ids.next();
         c.number = ++core.state().campaignCounter;
         c.kingdomId = k.id;
         c.kind = kind;
@@ -517,7 +517,7 @@ public final class MilitarySystem {
     /** Treino ou "vão para tal lugar": o líder vai na frente, os outros em fileiras de 4; ficam {@code seconds} lá. */
     public Campaign assemble(Kingdom k, Campaign.Kind kind, Npc leader, List<Npc> people, Pos target, int seconds, String order) {
         Campaign c = new Campaign();
-        c.id = UUID.randomUUID();
+        c.id = com.kingdomsai.core.common.Ids.next();
         c.number = ++core.state().campaignCounter;
         c.kingdomId = k.id;
         c.kind = kind;

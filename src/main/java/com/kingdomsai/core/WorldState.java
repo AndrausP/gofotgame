@@ -14,7 +14,8 @@ public final class WorldState {
     public static final int SCHEMA_VERSION = 8;
 
     public int schemaVersion = SCHEMA_VERSION;
-    public long seed = new Random().nextLong();
+    /** Semente do mundo; -Dkingdoms.seed=N fixa para reproduzir um caso. */
+    public long seed = Long.getLong("kingdoms.seed", new Random().nextLong());
     public long tick;
     public long eventSeq;
 

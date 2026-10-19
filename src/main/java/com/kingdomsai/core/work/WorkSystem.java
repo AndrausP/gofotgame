@@ -53,7 +53,7 @@ public final class WorkSystem {
 
     /** Cria a cadeia já validada. As pessoas adotam a nova rotina (largam a anterior). */
     public WorkChain start(Kingdom k, WorkChain c, String orderText) {
-        c.id = UUID.randomUUID();
+        c.id = com.kingdomsai.core.common.Ids.next();
         c.kingdomId = k.id;
         c.number = ++core.state().chainCounter;
         c.createdTick = core.tick();
@@ -378,7 +378,7 @@ public final class WorkSystem {
 
     private void write(WorkChain c, Kingdom k, WorkChain.Role r, WorkChain.Step s, Npc n, Target t) {
         Document d = new Document();
-        d.id = UUID.randomUUID();
+        d.id = com.kingdomsai.core.common.Ids.next();
         d.kingdomId = k.id;
         d.authorId = n.id;
         d.authorName = n.name;

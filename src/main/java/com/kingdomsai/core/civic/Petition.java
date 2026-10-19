@@ -8,7 +8,7 @@ import java.util.UUID;
 public final class Petition {
     public enum Status { PENDING, APPROVED, REJECTED, EXPIRED }
 
-    public UUID id = UUID.randomUUID();
+    public UUID id = com.kingdomsai.core.common.Ids.next();
     public int number;
     public UUID kingdomId;
     public UUID authorId;

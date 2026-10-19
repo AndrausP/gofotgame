@@ -71,7 +71,7 @@ public final class SkillSystem {
             PhysicalJob old = core.state().jobs.get(n.jobId);
             if (old != null && old.status.live()) cancel(old, "substituída por uma nova ordem");
         }
-        job.id = UUID.randomUUID();
+        job.id = com.kingdomsai.core.common.Ids.next();
         job.number = ++core.state().jobCounter;
         job.createdTick = core.tick();
         job.stateSince = core.tick();

@@ -148,7 +148,7 @@ public final class Npc {
     }
 
     public void remember(long tick, String text, int importance, UUID about, String... tags) {
-        memories.add(new Memory(UUID.randomUUID(), tick, text, Text.clamp(importance, 0, 100), Set.of(tags), about));
+        memories.add(new Memory(com.kingdomsai.core.common.Ids.next(), tick, text, Text.clamp(importance, 0, 100), Set.of(tags), about));
         // Memória seletiva: mantém as mais importantes/recentes.
         if (memories.size() > 40) {
             memories.sort(Comparator.comparingDouble(m -> -(m.importance() + m.tick() / 24000.0)));

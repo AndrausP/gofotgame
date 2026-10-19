@@ -191,7 +191,7 @@ public final class DiplomacySystem {
                     + ", medo " + (int) att.fear + ".";
         }
         Treaty t = new Treaty();
-        t.id = UUID.randomUUID();
+        t.id = com.kingdomsai.core.common.Ids.next();
         t.type = type;
         t.a = from.id;
         t.b = to.id;
