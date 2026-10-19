@@ -12,6 +12,6 @@ call gradlew.bat --console=plain -q bridgeJar || (popd & exit /b 1)
 popd
 set JAVA=java
 if not "%JAVA_HOME%"=="" set JAVA=%JAVA_HOME%\bin\java
-start "ponte Kingdoms" "%JAVA%" -Dstdout.encoding=UTF-8 -jar "%ROOT%\build\bridge\kingdoms-bridge.jar" --save "%KINGDOMS_SAVE%" %KINGDOMS_LLM_ARGS%
+start "ponte Kingdoms" cmd /c "for /l %%i in (1,1,1000) do ( \"%JAVA%\" -Dstdout.encoding=UTF-8 -jar \"%ROOT%\build\bridge\kingdoms-bridge.jar\" --save \"%KINGDOMS_SAVE%\" %KINGDOMS_LLM_ARGS% & if not errorlevel 42 exit /b )"
 ping -n 5 127.0.0.1 >nul
 "%GODOT_EXE%" --path "%~dp0"

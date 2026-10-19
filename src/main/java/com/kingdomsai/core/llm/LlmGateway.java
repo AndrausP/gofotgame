@@ -228,7 +228,7 @@ public final class LlmGateway {
         if (provider == mock) return "Provider: regras (mock)";
         long now = System.currentTimeMillis();
         String s = provider == claudeCode || provider == api
-                ? "Provider: Claude Code · modelos " + config.claudeNpcModel + " (súditos) / " + config.claudeCouncilModel + " (conselho) · comando " + config.claudeCommand
+                ? "IA: Claude · modelos " + config.claudeNpcModel + " (súditos) / " + config.claudeCouncilModel + " (conselho) · comando " + config.claudeCommand
                 : "Provider: " + provider.name() + " · modelo " + config.model + " · " + config.endpoint;
         if (overBudget()) s += String.format(java.util.Locale.ROOT, " · orçamento de IA atingido (US$ %.2f); usando regras", ledger.totalCostUsd());
         else if (now < downUntil) s += " · indisponível (tentando de novo em " + (downUntil - now) / 1000 + "s; usando regras)";
@@ -259,7 +259,7 @@ public final class LlmGateway {
             try {
                 Plan.parse(raw);
                 downUntil = 0;
-                return "✓ " + (provider == claudeCode ? "Claude Code" : provider.name()) + " / " + config.activeModel() + " respondeu JSON válido em " + ms + " ms.";
+                return "✓ " + (provider == claudeCode ? "IA: Claude" : provider.name()) + " / " + config.activeModel() + " respondeu JSON válido em " + ms + " ms.";
             } catch (RuntimeException e) {
                 return "⚠ Respondeu em " + ms + " ms, mas não em JSON válido: " + raw.substring(0, Math.min(120, raw.length()));
             }
@@ -358,6 +358,7 @@ public final class LlmGateway {
 
     private void record(String purpose, ProviderResult res) {
         ledger.record(purpose, res.usage());
+        ledger.recordOption(config.optionId(), res.usage());
         core.state().aiSpentUsd = ledger.totalCostUsd();
         core.state().aiCalls = ledger.totalCalls();
     }

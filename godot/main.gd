@@ -47,6 +47,8 @@ var info_label: Label
 var log_box: RichTextLabel
 var input: LineEdit
 var ai_panel: AiPanel
+var menu: GameMenu
+var was_up := false
 var ai_label: Label
 var ai_flash := 0.0
 var mode_buttons := {}
@@ -85,6 +87,7 @@ func _ready() -> void:
 	bridge.blocks.connect(_on_blocks)
 	bridge.fx.connect(_on_fx)
 	ai_panel.setup(bridge)
+	menu.setup(bridge)
 	if "--ai-panel" in args:
 		ai_panel.toggle()
 	ai_panel.fallback_seen.connect(func(_n): ai_flash = 12.0)
@@ -93,6 +96,13 @@ func _ready() -> void:
 
 
 func _on_connection(up: bool) -> void:
+	if up and was_up and not smoke:
+		get_tree().reload_current_scene() # a ponte reiniciou (mundo novo): recomeça limpo
+		return
+	if up:
+		was_up = true
+		if not smoke:
+			menu.open()
 	if up:
 		_log("[color=#8fd48f]ponte conectada[/color]")
 	else:
@@ -248,6 +258,17 @@ func _button(text: String, cb: Callable, toggle := false) -> Button:
 	h.bg_color = Color(0.28, 0.3, 0.36, 1.0)
 	var p: StyleBoxFlat = n.duplicate()
 	p.bg_color = Color(0.78, 0.6, 0.18, 1.0)
+	for st in [n, h, p]:
+		st.set_corner_radius_all(14)
+		st.set_border_width_all(3)
+		st.border_color = Color(0.1, 0.07, 0.05)
+		st.border_width_bottom = 6
+	n.bg_color = Color(0.35, 0.62, 0.95) if not toggle else Color(0.3, 0.5, 0.75)
+	h.bg_color = n.bg_color.lightened(0.15)
+	p.bg_color = Color(1.0, 0.75, 0.2)
+	b.add_theme_color_override("font_color", Color.WHITE)
+	b.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
+	b.add_theme_constant_override("outline_size", 4)
 	b.add_theme_stylebox_override("normal", n)
 	b.add_theme_stylebox_override("hover", h)
 	b.add_theme_stylebox_override("pressed", p)
@@ -329,8 +350,12 @@ func _build_ui() -> void:
 		var kind: String = tdef[1]
 		wr.add_child(_button(tdef[0], func(): _tool(kind)))
 
+	sv.add_child(GameMenu.cartoon("Menu", Color(0.95, 0.6, 0.15), func(): menu.open()))
 	sv.add_child(_section("IA"))
 	sv.add_child(_button("Painel de IA", func(): ai_panel.toggle()))
+	menu = GameMenu.new()
+	root.add_child(menu)
+	menu.visible = false
 	ai_panel = AiPanel.new()
 	ai_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	ai_panel.offset_top = 372
@@ -803,6 +828,9 @@ func _update_camera() -> void:
 
 
 func _unhandled_input(e: InputEvent) -> void:
+	if e is InputEventKey and e.pressed and e.keycode == KEY_ESCAPE:
+		menu.open()
+		return
 	if e is InputEventMouseButton and e.pressed:
 		if e.button_index == MOUSE_BUTTON_WHEEL_UP:
 			dist = maxf(6.0, dist * 0.9)

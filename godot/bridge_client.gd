@@ -84,5 +84,5 @@ func _dispatch(msg: Dictionary) -> void:
 		"chunk": chunk.emit(msg)
 		"blocks": blocks.emit(msg)
 		"fx": fx.emit(msg)
-		"ai_status", "ai_test", "ai_login": ai.emit(msg)
+		"ai_status", "ai_test", "ai_login", "menu_info": ai.emit(msg)
 		"reply", "async", "error": lines.emit(msg)

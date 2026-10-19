@@ -16,8 +16,12 @@ if [ -z "$GODOT_EXE" ]; then
 fi
 KINGDOMS_SAVE=${KINGDOMS_SAVE:-$HOME/kingdomsai-saves/mundo1}
 ./gradlew --console=plain -q bridgeJar
-"$JAVA" -Dstdout.encoding=UTF-8 -jar build/bridge/kingdoms-bridge.jar --save "$KINGDOMS_SAVE" $KINGDOMS_LLM_ARGS &
+# a ponte sai com 42 quando o menu pede "mundo novo": sobe de novo (o Godot reconecta sozinho)
+( while true; do
+    "$JAVA" -Dstdout.encoding=UTF-8 -jar build/bridge/kingdoms-bridge.jar --save "$KINGDOMS_SAVE" $KINGDOMS_LLM_ARGS
+    [ $? -eq 42 ] || break
+  done ) &
 BRIDGE=$!
-trap 'kill $BRIDGE 2>/dev/null' EXIT
+trap 'pkill -P $BRIDGE 2>/dev/null; kill $BRIDGE 2>/dev/null' EXIT
 sleep 4
 "$GODOT_EXE" --path godot

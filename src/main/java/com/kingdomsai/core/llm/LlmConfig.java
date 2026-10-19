@@ -36,11 +36,21 @@ public final class LlmConfig {
     public double claudeCallBudgetNpcUsd = 0.05;
     public double claudeCallBudgetCouncilUsd = 0.25;
 
+    /** claude_code: modo {@code --bare} do CLI — não lê o login da assinatura, só ANTHROPIC_API_KEY (variável de ambiente ou {@link #apiKey}). */
+    public boolean claudeBare = false;
+
     public static final List<String> EFFORTS = List.of("", "low", "medium", "high", "xhigh", "max");
     private static final Set<String> NPC_PURPOSES = Set.of("agenda", "conversa", "npc_dialogue", "test");
 
     public boolean isClaudeCode() {
         return provider != null && (provider.equalsIgnoreCase(ClaudeCodeProvider.NAME) || isApi());
+    }
+
+    /** Id da opção do painel de IA: mock | claude_code | claude_bare | anthropic_api | ollama (ou o nome do provider). */
+    public String optionId() {
+        if (!enabled || provider == null) return "mock";
+        String p = provider.toLowerCase();
+        return p.equals(ClaudeCodeProvider.NAME) && claudeBare ? "claude_bare" : p;
     }
 
     /** Provider por chave de API da Anthropic (usa os mesmos modelos claude* do Claude Code). */
@@ -101,6 +111,7 @@ public final class LlmConfig {
         c.claudeNpcModel = claudeNpcModel;
         c.claudeCouncilModel = claudeCouncilModel;
         c.claudeEffort = claudeEffort;
+        c.claudeBare = claudeBare;
         c.budgetUsd = budgetUsd;
         c.claudeCallBudgetNpcUsd = claudeCallBudgetNpcUsd;
         c.claudeCallBudgetCouncilUsd = claudeCallBudgetCouncilUsd;

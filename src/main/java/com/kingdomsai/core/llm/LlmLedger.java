@@ -46,6 +46,8 @@ public final class LlmLedger {
     }
 
     private final Map<String, Entry> byPurpose = new TreeMap<>();
+    /** Por opção do painel (regras, Claude, chave de API, Ollama): chamadas e custo, para mostrar a média. */
+    private final Map<String, Entry> byOption = new TreeMap<>();
 
     private Entry of(String purpose) {
         return byPurpose.computeIfAbsent(purpose == null || purpose.isBlank() ? "outro" : purpose, k -> new Entry());
@@ -64,6 +66,27 @@ public final class LlmLedger {
             e.costUsd += u.costUsd();
             e.pricedCalls++;
         }
+    }
+
+    /** Soma a chamada na opção do painel que a atendeu. */
+    public synchronized void recordOption(String option, ProviderResult.Usage u) {
+        Entry e = byOption.computeIfAbsent(option, k -> new Entry());
+        e.calls++;
+        if (u.known()) {
+            e.costUsd += u.costUsd();
+            e.pricedCalls++;
+        }
+    }
+
+    /** Custo médio por chamada da opção, em US$; -1 se ainda não há chamada com custo conhecido. */
+    public synchronized double avgCostUsd(String option) {
+        Entry e = byOption.get(option);
+        return e == null || e.pricedCalls == 0 ? -1 : e.costUsd / e.pricedCalls;
+    }
+
+    public synchronized int optionCalls(String option) {
+        Entry e = byOption.get(option);
+        return e == null ? 0 : e.calls;
     }
 
     /** Chamada que falhou (timeout, CLI quebrado, JSON inválido). */
@@ -104,6 +127,7 @@ public final class LlmLedger {
 
     public synchronized void reset() {
         byPurpose.clear();
+        byOption.clear();
     }
 
     /** Texto do comando "ai custo". */

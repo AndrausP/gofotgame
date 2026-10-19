@@ -45,9 +45,26 @@ public final class ClaudeCodeProvider implements LlmProvider {
     /** Abre o processo — trocado nos testes por um processo falso. */
     public interface Launcher {
         Process start(List<String> command, Path workDir) throws IOException;
+
+        /** Com variáveis de ambiente extras (o modo --bare recebe a chave daqui). Por padrão ignora o extra. */
+        default Process start(List<String> command, Path workDir, java.util.Map<String, String> extraEnv) throws IOException {
+            return start(command, workDir);
+        }
     }
 
-    public static final Launcher SYSTEM = (command, dir) -> new ProcessBuilder(command).directory(dir.toFile()).start();
+    public static final Launcher SYSTEM = new Launcher() {
+        @Override
+        public Process start(List<String> command, Path dir) throws IOException {
+            return new ProcessBuilder(command).directory(dir.toFile()).start();
+        }
+
+        @Override
+        public Process start(List<String> command, Path dir, java.util.Map<String, String> extraEnv) throws IOException {
+            ProcessBuilder pb = new ProcessBuilder(command).directory(dir.toFile());
+            pb.environment().putAll(extraEnv);
+            return pb.start();
+        }
+    };
 
     /** Quem limita a concorrência é a fila do LlmGateway (maxConcurrentCalls); aqui só há threads sob demanda. */
     private static final ExecutorService POOL = Executors.newCachedThreadPool(r -> {
@@ -128,7 +145,9 @@ public final class ClaudeCodeProvider implements LlmProvider {
             List<String> cmd = command(cfg, request.purpose(), request.schema(), systemFile.getFileName().toString(), windows, onPath(windows));
             long t0 = System.currentTimeMillis();
             try {
-                p = launcher.start(cmd, workDir);
+                p = cfg.claudeBare && cfg.apiKey != null && !cfg.apiKey.isBlank()
+                        ? launcher.start(cmd, workDir, java.util.Map.of("ANTHROPIC_API_KEY", cfg.apiKey))
+                        : launcher.start(cmd, workDir);
                 LIVE.add(p);
             } catch (IOException e) {
                 throw new IllegalStateException(notFound(cfg), e);
@@ -185,7 +204,13 @@ public final class ClaudeCodeProvider implements LlmProvider {
                 return "Modelo do Claude Code inválido: \"" + m + "\". Use haiku, sonnet, opus ou fable.";
         if (cfg.claudeEffort == null || !LlmConfig.EFFORTS.contains(cfg.claudeEffort))
             return "Esforço do Claude Code inválido: \"" + cfg.claudeEffort + "\". Use low, medium, high, xhigh ou max (ou vazio).";
+        if (cfg.claudeBare && (cfg.apiKey == null || cfg.apiKey.isBlank()) && blank(System.getenv("ANTHROPIC_API_KEY")))
+            return "Modo com chave: defina a variável de ambiente ANTHROPIC_API_KEY (o modo --bare do CLI não usa o login da assinatura).";
         return null;
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
     }
 
     /** Só o executável do Claude Code (com ou sem caminho): o jogo nunca roda outro programa por esta configuração. */
@@ -212,6 +237,7 @@ public final class ClaudeCodeProvider implements LlmProvider {
         }
         cmd.add(exe);
         cmd.add("-p");
+        if (cfg.claudeBare) cmd.add("--bare"); // sem login/keychain/hooks: autentica só por ANTHROPIC_API_KEY
         cmd.add("--output-format");
         cmd.add("json");
         cmd.add("--model");
@@ -365,6 +391,8 @@ public final class ClaudeCodeProvider implements LlmProvider {
         Matcher m = UNKNOWN_OPTION.matcher(msg);
         if (m.find())
             return "Seu Claude Code é antigo e não conhece a opção " + m.group(1) + ". Atualize: abra o terminal e rode \"claude update\".";
+        if (cfg.claudeBare && (low.contains("not logged in") || low.contains("api key") || low.contains("authentication") || low.contains("401")))
+            return "O CLI recusou a chave: confira ANTHROPIC_API_KEY (o modo --bare não usa o login da assinatura).";
         if (low.contains("not logged in") || low.contains("/login") || low.contains("please run") && low.contains("login")
                 || low.contains("invalid api key") || low.contains("oauth") && (low.contains("expired") || low.contains("revoked"))
                 || low.contains("authentication_error") || low.contains("401"))

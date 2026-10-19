@@ -89,6 +89,29 @@ public final class BridgeServer {
         if (saveDir != null) WorldSave.save(host, saveDir);
     }
 
+    /** Mundo novo: apaga o save, grava a semente/nome pedidos em novo.json e encerra (código 42); o script de jogo sobe a ponte de novo. */
+    private void newWorld(Client c, JsonObject msg) {
+        if (saveDir == null || !c.isLoopback()) {
+            c.send(lines("error", List.of("✗ Mundo novo precisa de --save e de conexão local.")));
+            return;
+        }
+        try {
+            long seed = msg.has("seed") && !msg.get("seed").getAsString().isBlank() ? Long.parseLong(msg.get("seed").getAsString().trim()) : System.nanoTime() & 0xFFFFFFFFL;
+            String name = msg.has("name") ? msg.get("name").getAsString().replaceAll("[\\r\\n\"\\\\]", " ").trim() : "";
+            if (name.isEmpty()) name = "Reino Novo";
+            if (java.nio.file.Files.isDirectory(saveDir))
+                try (var st = java.nio.file.Files.walk(saveDir)) {
+                    for (var p : st.sorted(java.util.Comparator.reverseOrder()).toList()) if (!p.equals(saveDir) && !p.getFileName().toString().equals(AiPanel.FILE)) java.nio.file.Files.deleteIfExists(p);
+                }
+            java.nio.file.Files.createDirectories(saveDir);
+            java.nio.file.Files.writeString(saveDir.resolve("novo.json"), "{\"seed\":" + seed + ",\"name\":\"" + name + "\"}");
+            running = false;
+            Runtime.getRuntime().halt(42);
+        } catch (IOException | RuntimeException e) {
+            c.send(lines("error", List.of("✗ Não consegui criar o mundo: " + e.getMessage())));
+        }
+    }
+
     public VoxelHost host() {
         return host;
     }
@@ -240,6 +263,27 @@ public final class BridgeServer {
             }
             case "view" -> c.setView(msg.get("x").getAsInt(), msg.get("z").getAsInt(), msg.get("r").getAsInt());
             case "call_all" -> c.send(lines("reply", callAll()));
+            case "menu_info" -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("op", "menu_info");
+                m.put("saved", saveDir != null && WorldSave.exists(saveDir));
+                m.put("can_save", saveDir != null);
+                Kingdom mine = host.core.kingdomOfPlayer(player);
+                m.put("name", mine == null ? "" : mine.name);
+                m.put("day", host.core.day());
+                c.send(m);
+            }
+            case "save_now" -> {
+                String res;
+                try {
+                    saveNow();
+                    res = saveDir == null ? "⚠ Sem pasta de save (rode com --save)." : "✓ Jogo salvo.";
+                } catch (IOException e) {
+                    res = "✗ Falha ao salvar: " + e.getMessage();
+                }
+                c.send(lines("reply", List.of(res)));
+            }
+            case "new_world" -> newWorld(c, msg);
             case "ai_status" -> c.send(ai.status());
             case "ai_config" -> c.send(ai.configure(msg));
             case "ai_test" -> ai.test().whenComplete((r, err) -> {
@@ -526,6 +570,9 @@ public final class BridgeServer {
         void setView(int x, int z, int r) {
             int cx0 = Math.floorDiv(x, Chunk.SIZE), cz0 = Math.floorDiv(z, Chunk.SIZE);
             r = Math.max(1, Math.min(24, r));
+            // o Godot descarta blocos fora do alcance do viewer: quem saiu da janela é reenviado se o rei voltar
+            final int rr = r;
+            sent.removeIf(key -> Math.max(Math.abs((int) (key >> 32) - cx0), Math.abs((int) (long) key - cz0)) > rr + 1);
             List<long[]> list = new ArrayList<>();
             for (int dz = -r; dz <= r; dz++)
                 for (int dx = -r; dx <= r; dx++) {

@@ -96,6 +96,16 @@ public final class BridgeMain {
                 }
             }
         }
+        if (save != null && java.nio.file.Files.isRegularFile(save.resolve("novo.json"))) { // pedido de "mundo novo" vindo do menu
+            try {
+                var o = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(save.resolve("novo.json"))).getAsJsonObject();
+                seed = o.get("seed").getAsLong();
+                name = o.get("name").getAsString();
+                java.nio.file.Files.deleteIfExists(save.resolve("novo.json"));
+            } catch (RuntimeException e) {
+                System.out.println("bridge: novo.json inválido: " + e);
+            }
+        }
         CoreConfig cfg = new CoreConfig();
         VoxelHost host;
         boolean fresh = true;
