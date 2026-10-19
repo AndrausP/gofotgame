@@ -146,7 +146,8 @@ func _apply() -> void:
 
 
 func _test() -> void:
-	_msg.text = "Testando…"
+	_msg.text = "Testando… (pode levar alguns segundos)"
+	_apply()  # testa o que está na tela: aplica antes
 	bridge.send({"op": "ai_test"})
 
 
@@ -155,6 +156,8 @@ func _on_provider_changed() -> void:
 		return
 	_models_row.visible = provider_id() == "claude_code"
 	_login_btn.visible = provider_id() == "claude_code"
+	if provider_id() == "claude_code" and _budget.value <= 0.0:
+		_budget.value = 1.0
 
 
 func _fill_models(opt: OptionButton, models: Array, current: String) -> void:
@@ -196,9 +199,8 @@ func _show_status(msg: Dictionary) -> void:
 		_provider.select(sel)
 	var claude := str(msg.get("provider", "")) == "claude_code"
 	var models: Array = msg.get("models", [])
-	if claude:
-		_fill_models(_npc_model, models, str(msg.get("npc_model", "")))
-		_fill_models(_council_model, models, str(msg.get("council_model", "")))
+	_fill_models(_npc_model, models, str(msg.get("npc_model", "haiku")) if claude else "haiku")
+	_fill_models(_council_model, models, str(msg.get("council_model", "sonnet")) if claude else "sonnet")
 	_models_row.visible = claude
 	_login_btn.visible = claude
 	_budget.value = float(msg.get("budget_usd", 0.0))
