@@ -1,5 +1,8 @@
 package com.kingdomsai.core.llm;
 
+import java.util.List;
+import java.util.Set;
+
 /** Equivalente à seção [ai] do kingdomsai-common.toml. */
 public final class LlmConfig {
     public boolean enabled = true;
@@ -19,8 +22,20 @@ public final class LlmConfig {
     public boolean fallbackToRules = true;
     /** claude_code: o executável do Claude Code (claude, claude.exe, claude.cmd ou o caminho completo). */
     public String claudeCommand = "claude";
-    /** claude_code: haiku (rápido, recomendado) · sonnet · opus · fable. */
-    public String claudeModel = "haiku";
+    /** claude_code, súditos (agenda, conversa, fala com o rei): haiku (rápido, barato) · sonnet · opus · fable. */
+    public String claudeNpcModel = "haiku";
+    /** claude_code, conselho e decisões raras (conselho, rei rival, arquiteto, militar, reparo): sonnet por padrão. */
+    public String claudeCouncilModel = "sonnet";
+    /** claude_code: esforço de raciocínio (low|medium|high|xhigh|max); vazio = padrão do modelo. */
+    public String claudeEffort = "";
+    /** Teto de gasto estimado por sessão de jogo, em US$; 0 = sem teto. Estourou, a LLM desliga e o jogo segue pelas regras. */
+    public double budgetUsd = 0;
+    /** claude_code: trava extra por chamada (--max-budget-usd), em US$. */
+    public double claudeCallBudgetNpcUsd = 0.05;
+    public double claudeCallBudgetCouncilUsd = 0.25;
+
+    public static final List<String> EFFORTS = List.of("", "low", "medium", "high", "xhigh", "max");
+    private static final Set<String> NPC_PURPOSES = Set.of("agenda", "conversa", "npc_dialogue", "test");
 
     public boolean isClaudeCode() {
         return provider != null && provider.equalsIgnoreCase(ClaudeCodeProvider.NAME);
@@ -31,15 +46,30 @@ public final class LlmConfig {
         return isClaudeCode() ? Math.max(timeoutMs, ClaudeCodeProvider.MIN_TIMEOUT_MS) : timeoutMs;
     }
 
+    /** Pedido da vida dos súditos (modelo pequeno) ou decisão rara do conselho (modelo maior)? */
+    public static boolean isNpcPurpose(String purpose) {
+        return purpose == null || NPC_PURPOSES.contains(purpose);
+    }
+
     /** Modelo para este tipo de pedido: súditos comuns no pequeno, conselho e ordens do rei no maior. */
     public String modelFor(String purpose) {
         boolean small = "agenda".equals(purpose) || "conversa".equals(purpose) || "npc_dialogue".equals(purpose);
         return small && npcModel != null && !npcModel.isBlank() ? npcModel : model;
     }
 
-    /** Modelo em uso, conforme o provider. */
+    /** Claude Code: mesma regra de {@link #modelFor}, com os modelos próprios do Claude. */
+    public String claudeModelFor(String purpose) {
+        return isNpcPurpose(purpose) ? claudeNpcModel : claudeCouncilModel;
+    }
+
+    /** Claude Code: teto por chamada, conforme a finalidade. */
+    public double claudeCallBudgetFor(String purpose) {
+        return isNpcPurpose(purpose) ? claudeCallBudgetNpcUsd : claudeCallBudgetCouncilUsd;
+    }
+
+    /** Modelo em uso, conforme o provider (Claude Code: "súditos/conselho"). */
     public String activeModel() {
-        return isClaudeCode() ? claudeModel : model;
+        return isClaudeCode() ? claudeNpcModel + "/" + claudeCouncilModel : model;
     }
 
     public LlmConfig() {}

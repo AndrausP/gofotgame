@@ -134,7 +134,7 @@ flowchart TD
 
 ---
 
-### F0 — Build e testes confiáveis
+### F0 — Build e testes confiáveis — **Feita**
 
 **Objetivo:** qualquer pessoa (e o Claude Code) compila, testa e roda com um comando, em Windows e Linux/macOS.
 
@@ -163,7 +163,7 @@ flowchart TD
 
 ---
 
-### F1 — Claude Code como provider de primeira classe
+### F1 — Claude Code como provider de primeira classe — **Feita**
 
 **Objetivo:** `--llm claude_code` é a forma recomendada de jogar com IA no PC do desenvolvedor: modelo certo por finalidade, saída validada por schema, custo medido e com teto.
 

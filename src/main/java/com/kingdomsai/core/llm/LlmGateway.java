@@ -25,6 +25,8 @@ public final class LlmGateway {
     private volatile String lastError = "";
     private volatile String lastPrompt = "";
     private volatile String lastResponse = "";
+    private final LlmLedger ledger = new LlmLedger();
+    private volatile boolean budgetNoticeSent;
 
     public LlmGateway(KingdomsCore core) {
         this.core = core;
@@ -32,8 +34,18 @@ public final class LlmGateway {
         configure(config);
     }
 
+    public LlmLedger ledger() {
+        return ledger;
+    }
+
+    /** O gasto estimado da sessão passou do teto configurado (0 = sem teto)? */
+    public boolean overBudget() {
+        return config.budgetUsd > 0 && ledger.totalCostUsd() >= config.budgetUsd;
+    }
+
     public void configure(LlmConfig cfg) {
         this.config = cfg;
+        budgetNoticeSent = false;
         this.provider = switch (cfg.provider.toLowerCase()) {
             case "ollama" -> new HttpProviders.Ollama();
             case "openai", "lmstudio", "custom" -> new HttpProviders.OpenAiCompatible();
@@ -58,9 +70,10 @@ public final class LlmGateway {
         if (provider == mock) return "Provider: regras (mock)";
         long now = System.currentTimeMillis();
         String s = provider == claudeCode
-                ? "Provider: Claude Code · modelo " + config.claudeModel + " · comando " + config.claudeCommand
+                ? "Provider: Claude Code · modelos " + config.claudeNpcModel + " (súditos) / " + config.claudeCouncilModel + " (conselho) · comando " + config.claudeCommand
                 : "Provider: " + provider.name() + " · modelo " + config.model + " · " + config.endpoint;
-        if (now < downUntil) s += " · indisponível (tentando de novo em " + (downUntil - now) / 1000 + "s; usando regras)";
+        if (overBudget()) s += String.format(java.util.Locale.ROOT, " · orçamento de IA atingido (US$ %.2f); usando regras", ledger.totalCostUsd());
+        else if (now < downUntil) s += " · indisponível (tentando de novo em " + (downUntil - now) / 1000 + "s; usando regras)";
         if (!lastError.isEmpty()) s += " · último erro: " + lastError;
         return s;
     }
@@ -78,8 +91,10 @@ public final class LlmGateway {
         long t0 = System.currentTimeMillis();
         LlmRequest req = new LlmRequest("test", "Responda apenas com JSON.", "Responda exatamente: {\"reply\":\"ok\",\"actions\":[]}",
                 null, null, "teste");
-        return provider.complete(req, config).orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS).handle((raw, err) -> {
+        return provider.completeDetailed(req, config).orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS).handle((res, err) -> {
             long ms = System.currentTimeMillis() - t0;
+            String raw = res == null ? "" : res.text();
+            if (res != null) record(req.purpose(), res, ms);
             if (err != null) {
                 Throwable c = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
                 return "✗ Falhou em " + ms + " ms: " + (c instanceof TimeoutException ? "timeout" : c.getMessage());
@@ -104,7 +119,12 @@ public final class LlmGateway {
 
     /** Há um modelo de verdade respondendo agora (não as regras)? */
     public boolean live() {
-        return config.enabled && provider != mock && System.currentTimeMillis() >= downUntil;
+        if (!config.enabled || provider == mock || System.currentTimeMillis() < downUntil) return false;
+        if (overBudget()) {
+            announceBudget();
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -117,10 +137,16 @@ public final class LlmGateway {
         while (!calls.isEmpty() && now - calls.peekFirst() > 60_000) calls.pollFirst();
         if (calls.size() >= Math.max(1, config.maxCallsPerMinute - 5)) return CompletableFuture.completedFuture(null);
         calls.addLast(now);
-        return provider.complete(req, config).orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS).handle((raw, err) -> {
-            if (err != null) return null;
+        long t0 = now;
+        return provider.completeDetailed(req, config).orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS).handle((res, err) -> {
+            long ms = System.currentTimeMillis() - t0;
+            if (err != null) {
+                ledger.recordError(req.purpose(), ms);
+                return null;
+            }
+            record(req.purpose(), res, ms);
             try {
-                return Plan.parse(raw);
+                return Plan.parse(res.text());
             } catch (RuntimeException e) {
                 return null;
             }
@@ -131,6 +157,10 @@ public final class LlmGateway {
         if (!config.enabled || provider == mock) return CompletableFuture.completedFuture(new Result(mock.interpret(req), mock.name(), false, ""));
         long now = System.currentTimeMillis();
         if (now < downUntil) return fallback(req, "modelo indisponível");
+        if (overBudget()) {
+            announceBudget();
+            return fallback(req, "orçamento de IA da sessão atingido");
+        }
         while (!calls.isEmpty() && now - calls.peekFirst() > 60_000) calls.pollFirst();
         if (calls.size() >= config.maxCallsPerMinute) return fallback(req, "limite de chamadas por minuto");
         calls.addLast(now);
@@ -139,13 +169,16 @@ public final class LlmGateway {
     }
 
     private CompletableFuture<Result> attempt(LlmRequest req, int tryNo) {
-        LlmRequest effective = tryNo == 0 ? req : new LlmRequest(req.purpose(), req.system(),
-                req.user() + "\n\nATENÇÃO: sua resposta anterior não era JSON válido. Responda SOMENTE o objeto JSON.",
-                req.kingdomId(), req.npcId(), req.rawPlayerText());
-        return provider.complete(effective, config)
+        LlmRequest effective = tryNo == 0 ? req
+                : req.withUser(req.user() + "\n\nATENÇÃO: sua resposta anterior não era JSON válido. Responda SOMENTE o objeto JSON.");
+        long t0 = System.currentTimeMillis();
+        return provider.completeDetailed(effective, config)
                 .orTimeout(config.effectiveTimeoutMs() + 500L, TimeUnit.MILLISECONDS)
-                .handle((raw, err) -> {
+                .handle((res, err) -> {
+                    long ms = System.currentTimeMillis() - t0;
+                    String raw = res == null ? null : res.text();
                     if (err != null) {
+                        ledger.recordError(req.purpose(), ms);
                         Throwable cause = err instanceof CompletionException && err.getCause() != null ? err.getCause() : err;
                         lastError = cause instanceof TimeoutException ? "timeout"
                                 : cause instanceof IllegalStateException ? cause.getMessage() : cause.getClass().getSimpleName() + ": " + cause.getMessage();
@@ -153,6 +186,7 @@ public final class LlmGateway {
                         return fallback(req, lastError);
                     }
                     lastResponse = raw;
+                    record(req.purpose(), res, ms);
                     try {
                         Plan p = Plan.parse(raw);
                         lastError = "";
@@ -165,7 +199,26 @@ public final class LlmGateway {
                 }).thenCompose(f -> f);
     }
 
+    private void record(String purpose, ProviderResult res, long wallMs) {
+        ProviderResult.Usage u = res.usage();
+        ledger.record(purpose, u.latencyMs() > 0 ? u : new ProviderResult.Usage(u.costUsd(), u.inputTokens(), u.outputTokens(),
+                u.cacheReadTokens(), u.cacheCreationTokens(), wallMs, u.model()));
+        core.state().aiSpentUsd = ledger.totalCostUsd();
+        core.state().aiCalls = ledger.totalCalls();
+    }
+
+    /** Avisa uma única vez que o teto de gasto foi atingido e que o jogo segue pelas regras. */
+    private void announceBudget() {
+        if (budgetNoticeSent) return;
+        budgetNoticeSent = true;
+        String msg = String.format(java.util.Locale.ROOT, "Orçamento de IA da sessão atingido: US$ %.2f. Usando regras.", ledger.totalCostUsd());
+        lastError = msg;
+        core.mainThread().execute(() -> core.bus().publish(core.tick(), com.kingdomsai.core.event.EventType.AI_DECISION,
+                com.kingdomsai.core.event.GameEvent.Severity.WARN, null, null, msg));
+    }
+
     private CompletableFuture<Result> fallback(LlmRequest req, String why) {
+        ledger.recordFallback(req.purpose());
         if (!config.fallbackToRules)
             return CompletableFuture.completedFuture(new Result(new Plan("(Sem resposta: " + why + ")", java.util.List.of()), "nenhum", true, why));
         // O interpretador lê o estado do jogo: precisa rodar na thread principal.

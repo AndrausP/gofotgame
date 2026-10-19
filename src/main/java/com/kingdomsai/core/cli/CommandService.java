@@ -304,7 +304,7 @@ public final class CommandService {
             case "perf", "desempenho" -> {
                 double[] p = core.perf();
                 out.add("# Desempenho do Core");
-                out.add("Tick médio " + Text.fmt(p[0]) + " ms · pior tick " + Text.fmt(p[1]) + " ms (orçamento do Minecraft: 50 ms por tick)");
+                out.add("Tick médio " + Text.fmt(p[0]) + " ms · pior tick " + Text.fmt(p[1]) + " ms (orçamento: 50 ms por tick)");
                 out.add("Súditos vivos " + core.allAlive().size() + " · conversas até agora " + core.life().conversations());
             }
             case "job", "tarefa" -> job(k, player, a, out);
@@ -424,7 +424,7 @@ public final class CommandService {
         out.add("life — a vida da vila: humor, casais, amizades, brigas, boatos, conversas recentes · perf — desempenho do Core");
         out.add("call [nome] · follow [nome] [minutos] · dismiss [nome] — chama até onde você está (no Manager: tecla G)");
         out.add("village — tamanho da vila · build muralha [height=4] — muro sob medida ao redor da vila");
-        out.add("order <texto livre> · ai explain · ai ask <pergunta> · ai status");
+        out.add("order <texto livre> · ai explain · ai ask <pergunta> · ai status · ai custo");
         out.add("debug npc <nome> · debug ai [reino] · debug events · replay <nome> · rivals [n]");
         out.add("Tecla M: Manager Mode. Exemplo: /k order construam 2 casas e recrutem 3 soldados");
     }
@@ -1054,6 +1054,7 @@ public final class CommandService {
         switch (sub) {
             case "explain", "explicar" -> out.add("«Conselho» " + core.advisor().explain(k));
             case "ask", "perguntar" -> order(player, rest(a, 2), out);
+            case "custo", "cost" -> out.addAll(core.llm().ledger().describe(core.llm().config().budgetUsd));
             default -> {
                 out.add("# IA");
                 out.add(core.llm().status());

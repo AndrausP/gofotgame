@@ -27,6 +27,18 @@ public final class CoreConfig {
     /** Chamadas por minuto da IA para a vida dos súditos (as falas com o rei têm prioridade). */
     public int lifeLlmPerMinute = 4;
 
+    /** Quem hospeda o Core: "minecraft" (mod) ou "godot" (ponte + mundo voxel). Muda só os textos dos prompts. */
+    public String hostName = "minecraft";
+
+    public boolean isMinecraftHost() {
+        return "minecraft".equalsIgnoreCase(hostName);
+    }
+
+    /** "dentro do Minecraft" / "num mundo de blocos" — para os prompts. */
+    public String hostWorldPhrase() {
+        return isMinecraftHost() ? "dentro do Minecraft" : "num mundo de blocos";
+    }
+
     public CoreConfig() {}
 
     public int ticks(int seconds) {

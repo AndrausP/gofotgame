@@ -2,6 +2,13 @@
 
 Objetivo: um jogo próprio, no Godot, onde uma sociedade de NPCs movidos por regras e LLM cria relações, leis e conflitos num mundo gerado que pode ser destruído e se deteriora. O Core do mod (Java puro, sem nada de Minecraft, com 479 testes) já resolve a parte difícil — sociedade, economia, ordens, petições e leis — e fala com o mundo por interfaces; o Godot só precisa ocupar o lugar do adaptador do Minecraft.
 
+## Estado
+
+Roteiro de implementação por fases em `docs/PLANO_IMPLEMENTACAO.md` (F0–F8). Fases feitas:
+
+- **F0 — Build e testes confiáveis: Feita** (Gradle, `jogar.sh`, semente reproduzível `-Dkingdoms.seed`, `CLAUDE.md`).
+- **F1 — Claude Code como provider de primeira classe: Feita** (modelo por finalidade, `--json-schema`, custo/teto, textos sem Minecraft, teste de injeção).
+
 ## 1. Decisão principal: o que fazer com o Core
 
 Recomendação: opção A no protótipo; portar para C# (B) só se o jogo se provar divertido. Os testes do Java viram a especificação do port.

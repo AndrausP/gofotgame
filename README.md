@@ -10,6 +10,8 @@ O Core Java (sociedade, economia, ordens, petições, leis) roda sem Minecraft c
 
 Com LLM local: `set KINGDOMS_LLM_ARGS=--llm ollama --model llama3.1:8b --npc-model gemma3:1b` antes do `jogar.bat`. Sem isso o jogo usa o interpretador por regras.
 
+Com o **Claude Code** do seu próprio PC (login que você já fez com `claude`): `set KINGDOMS_LLM_ARGS=--llm claude_code` (súditos em `haiku`, conselho em `sonnet`, teto de US$ 1,00 por sessão). Opções: `--claude-model M` (súditos), `--claude-council-model M` (conselho; `--model M` vale para o conselho), `--claude-command CMD`, `--timeout MS`, `--budget-usd N`, `--effort low|medium|high|xhigh|max`; ou as variáveis `KINGDOMS_CLAUDE_MODEL`, `KINGDOMS_CLAUDE_COUNCIL_MODEL`, `KINGDOMS_CLAUDE_BUDGET_USD`. O comando `ai custo` mostra chamadas, gasto estimado e latência por finalidade. Com login de assinatura o valor é a estimativa do próprio cliente (o que limita de verdade é a cota do plano); com chave de API é cobrança real. Para distribuir o jogo a outras pessoas não use o seu login: veja a fase F7 do plano.
+
 ## Controles
 
 WASD move o marcador do rei · Q/E ou botão direito gira · roda do mouse aproxima · **Olhar**: clique num súdito para ver a ficha e `@frase` para falar com ele · **Quebrar/Colocar**: clique no bloco · **Chamar todos** · 1x/5x/20x · **Chuva/Sol/Fogo/Explodir/Água**: ferramentas do rei no marcador · a caixa de texto aceita qualquer comando do Core (`build casa 2`, `order proíbo camas vermelhas, troquem por azul`, `status`, `decrees`...).

@@ -28,6 +28,7 @@ public final class VoxelHost {
     }
 
     public VoxelHost(long seed, WorldState state, CoreConfig cfg) {
+        cfg.hostName = "godot";
         world = new VoxelWorld(seed);
         area = new LoadArea(world);
         core = new KingdomsCore(state, cfg);

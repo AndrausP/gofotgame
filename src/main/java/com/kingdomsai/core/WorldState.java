@@ -17,6 +17,9 @@ public final class WorldState {
     /** Semente do mundo; -Dkingdoms.seed=N fixa para reproduzir um caso. */
     public long seed = Long.getLong("kingdoms.seed", new Random().nextLong());
     public long tick;
+    /** Resumo do livro-caixa da IA (chamadas e gasto estimado da última sessão); o detalhe fica em LlmLedger. */
+    public double aiSpentUsd;
+    public int aiCalls;
     public long eventSeq;
 
     public Map<UUID, Kingdom> kingdoms = new LinkedHashMap<>();

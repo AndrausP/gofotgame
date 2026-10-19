@@ -83,12 +83,17 @@ public final class ClaudeCodeProvider implements LlmProvider {
 
     @Override
     public CompletableFuture<String> complete(LlmRequest request, LlmConfig cfg) {
+        return completeDetailed(request, cfg).thenApply(ProviderResult::text);
+    }
+
+    @Override
+    public CompletableFuture<ProviderResult> completeDetailed(LlmRequest request, LlmConfig cfg) {
         return CompletableFuture.supplyAsync(() -> run(request, cfg), POOL);
     }
 
     // ------------------------------------------------------------------ execução
 
-    private String run(LlmRequest request, LlmConfig cfg) {
+    private ProviderResult run(LlmRequest request, LlmConfig cfg) {
         String bad = validate(cfg);
         if (bad != null) throw new IllegalStateException(bad);
         Path systemFile = null;
@@ -99,7 +104,9 @@ public final class ClaudeCodeProvider implements LlmProvider {
             // o nome é relativo à pasta de trabalho, sem espaços — nada para o cmd.exe interpretar.
             systemFile = Files.createTempFile(workDir, "system-", ".txt");
             Files.writeString(systemFile, request.system() == null ? "" : request.system(), StandardCharsets.UTF_8);
-            List<String> cmd = command(cfg, systemFile.getFileName().toString(), windows, onPath(windows));
+            String model = cfg.claudeModelFor(request.purpose());
+            List<String> cmd = command(cfg, request.purpose(), request.schema(), systemFile.getFileName().toString(), windows, onPath(windows));
+            long t0 = System.currentTimeMillis();
             try {
                 p = launcher.start(cmd, workDir);
             } catch (IOException e) {
@@ -117,12 +124,12 @@ public final class ClaudeCodeProvider implements LlmProvider {
             int timeout = Math.max(cfg.timeoutMs, minTimeoutMs);
             if (!p.waitFor(timeout, TimeUnit.MILLISECONDS)) {
                 kill(p);
-                throw new IllegalStateException("Claude Code não respondeu em " + timeout / 1000 + " s (modelo " + cfg.claudeModel
+                throw new IllegalStateException("Claude Code não respondeu em " + timeout / 1000 + " s (modelo " + model
                         + "). Use um modelo mais rápido (haiku) ou aumente ai.timeout_ms.");
             }
             String stdout = out.get(5, TimeUnit.SECONDS);
             String stderr = err.get(5, TimeUnit.SECONDS);
-            return parseOutput(p.exitValue(), stdout, stderr, cfg);
+            return parseResult(p.exitValue(), stdout, stderr, cfg, model, System.currentTimeMillis() - t0);
         } catch (IOException e) {
             throw new IllegalStateException("Não consegui preparar a pasta do Claude Code (" + workDir + "): " + e.getMessage(), e);
         } catch (InterruptedException e) {
@@ -151,8 +158,11 @@ public final class ClaudeCodeProvider implements LlmProvider {
     public static String validate(LlmConfig cfg) {
         if (!isClaudeCommand(cfg.claudeCommand))
             return "Comando do Claude Code inválido: \"" + cfg.claudeCommand + "\". Use claude (ou o caminho completo até claude.exe / claude.cmd).";
-        if (cfg.claudeModel == null || !MODEL.matcher(cfg.claudeModel).matches())
-            return "Modelo do Claude Code inválido: \"" + cfg.claudeModel + "\". Use haiku, sonnet, opus ou fable.";
+        for (String m : new String[]{cfg.claudeNpcModel, cfg.claudeCouncilModel})
+            if (m == null || !MODEL.matcher(m).matches())
+                return "Modelo do Claude Code inválido: \"" + m + "\". Use haiku, sonnet, opus ou fable.";
+        if (cfg.claudeEffort == null || !LlmConfig.EFFORTS.contains(cfg.claudeEffort))
+            return "Esforço do Claude Code inválido: \"" + cfg.claudeEffort + "\". Use low, medium, high, xhigh ou max (ou vazio).";
         return null;
     }
 
@@ -165,8 +175,12 @@ public final class ClaudeCodeProvider implements LlmProvider {
         return base.equals("claude") || base.equals("claude.exe") || base.equals("claude.cmd");
     }
 
-    /** Monta o comando. {@code exists} diz se um arquivo existe (trocável nos testes). */
-    public static List<String> command(LlmConfig cfg, String systemFileName, boolean windows, Predicate<Path> exists) {
+    /**
+     * Monta o comando para esta finalidade. {@code exists} diz se um arquivo existe (trocável nos testes).
+     * O {@code schema} (se houver) vai em {@code --json-schema}; no Windows só quando o executável é um .exe, porque o
+     * cmd.exe (claude.cmd do npm) re-interpreta aspas e não há escape garantido — aí vale o parser tolerante do {@link Plan}.
+     */
+    public static List<String> command(LlmConfig cfg, String purpose, String schema, String systemFileName, boolean windows, Predicate<Path> exists) {
         String exe = resolve(cfg.claudeCommand.trim(), windows, exists);
         List<String> cmd = new ArrayList<>();
         // npm instala claude.cmd, que o Windows só abre via cmd.exe. Os argumentos abaixo não têm aspas nem espaços.
@@ -179,14 +193,33 @@ public final class ClaudeCodeProvider implements LlmProvider {
         cmd.add("--output-format");
         cmd.add("json");
         cmd.add("--model");
-        cmd.add(cfg.claudeModel);
+        cmd.add(cfg.claudeModelFor(purpose));
         cmd.add("--system-prompt-file");
         cmd.add(systemFileName);
         cmd.add("--tools=");                  // nenhuma ferramenta: não lê arquivos, não roda comandos
         cmd.add("--strict-mcp-config");       // nenhum servidor MCP do usuário
         cmd.add("--setting-sources=");        // ignora settings/hooks/CLAUDE.md do usuário
         cmd.add("--no-session-persistence");  // não enche o histórico do /resume com perguntas do jogo
+        if (schemaUsable(schema, windows, exe)) {
+            cmd.add("--json-schema");
+            // Windows (CreateProcess): aspas dentro de um argumento precisam de \" ; no Unix o argumento vai cru.
+            cmd.add(windows ? schema.replace("\"", "\\\"") : schema);
+        }
+        if (cfg.claudeEffort != null && !cfg.claudeEffort.isBlank()) {
+            cmd.add("--effort");
+            cmd.add(cfg.claudeEffort);
+        }
+        double budget = cfg.claudeCallBudgetFor(purpose);
+        if (budget > 0) {
+            cmd.add("--max-budget-usd");
+            cmd.add(String.format(Locale.ROOT, "%.2f", budget));
+        }
         return cmd;
+    }
+
+    private static boolean schemaUsable(String schema, boolean windows, String exe) {
+        if (!Schemas.safeForCommandLine(schema)) return false;
+        return !windows || !exe.toLowerCase(Locale.ROOT).endsWith(".cmd");
     }
 
     /** No Windows, acha claude.exe (instalador nativo) ou claude.cmd (npm) no PATH e nas pastas padrão. */
@@ -228,16 +261,47 @@ public final class ClaudeCodeProvider implements LlmProvider {
      * Erros viram mensagens que dizem o que fazer.
      */
     public static String parseOutput(int exit, String stdout, String stderr, LlmConfig cfg) {
+        return parseResult(exit, stdout, stderr, cfg, cfg.claudeCouncilModel, 0).text();
+    }
+
+    /**
+     * Como {@link #parseOutput}, com custo e uso de tokens. Com {@code --json-schema} o CLI devolve o objeto já validado em
+     * {@code structured_output}: ele tem prioridade sobre o texto de {@code result}.
+     */
+    public static ProviderResult parseResult(int exit, String stdout, String stderr, LlmConfig cfg, String requestedModel, long wallMs) {
         JsonObject o = lastJsonObject(stdout);
         if (o != null && o.has("result") || o != null && o.has("is_error")) {
             boolean error = o.has("is_error") && o.get("is_error").getAsBoolean();
             String subtype = o.has("subtype") ? o.get("subtype").getAsString() : "success";
             String result = o.has("result") && o.get("result").isJsonPrimitive() ? o.get("result").getAsString() : "";
             if (error || !subtype.equals("success")) throw new IllegalStateException(friendly(result.isBlank() ? subtype : result, cfg));
-            return stripFences(result);
+            String text = o.has("structured_output") && o.get("structured_output").isJsonObject()
+                    ? o.get("structured_output").toString() : stripFences(result);
+            return new ProviderResult(text, usage(o, requestedModel, wallMs));
         }
         if (exit != 0) throw new IllegalStateException(friendly((stderr + "\n" + stdout).strip(), cfg));
-        return stripFences(stdout == null ? "" : stdout.strip());
+        return new ProviderResult(stripFences(stdout == null ? "" : stdout.strip()));
+    }
+
+    private static ProviderResult.Usage usage(JsonObject o, String requestedModel, long wallMs) {
+        double cost = o.has("total_cost_usd") && o.get("total_cost_usd").isJsonPrimitive() ? o.get("total_cost_usd").getAsDouble() : -1;
+        long in = 0, out = 0, read = 0, create = 0;
+        if (o.has("usage") && o.get("usage").isJsonObject()) {
+            JsonObject u = o.getAsJsonObject("usage");
+            in = num(u, "input_tokens");
+            out = num(u, "output_tokens");
+            read = num(u, "cache_read_input_tokens");
+            create = num(u, "cache_creation_input_tokens");
+        }
+        String model = requestedModel;
+        if (o.has("modelUsage") && o.get("modelUsage").isJsonObject() && !o.getAsJsonObject("modelUsage").keySet().isEmpty())
+            model = o.getAsJsonObject("modelUsage").keySet().iterator().next();
+        long latency = wallMs > 0 ? wallMs : num(o, "duration_ms");
+        return new ProviderResult.Usage(cost, in, out, read, create, latency, model);
+    }
+
+    private static long num(JsonObject o, String key) {
+        return o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsLong() : 0;
     }
 
     private static JsonObject lastJsonObject(String text) {
@@ -287,9 +351,11 @@ public final class ClaudeCodeProvider implements LlmProvider {
                 || low.contains("no such file or directory") && low.contains("claude"))
             return notFound(cfg);
         if (low.contains("model") && (low.contains("not found") || low.contains("invalid") || low.contains("not available") || low.contains("404")))
-            return "O Claude Code não aceitou o modelo \"" + cfg.claudeModel + "\". Use haiku, sonnet, opus ou fable.";
+            return "O Claude Code não aceitou o modelo \"" + cfg.claudeNpcModel + "\" / \"" + cfg.claudeCouncilModel + "\". Use haiku, sonnet, opus ou fable.";
         if (low.contains("rate limit") || low.contains("usage limit") || low.contains("429") || low.contains("overloaded") || low.contains("529"))
             return "Claude Code sem cota agora (limite de uso). O jogo responde pelas regras até voltar. Detalhe: " + cut(msg, 140);
+        if (low.contains("max_budget") || low.contains("budget"))
+            return "Uma chamada passou do teto por chamada do Claude Code (" + cut(msg, 120) + "). Aumente o teto ou use um modelo menor.";
         if (low.contains("credit balance") || low.contains("billing"))
             return "Conta do Claude sem crédito: " + cut(msg, 160);
         return "Claude Code falhou: " + (msg.isBlank() ? "sem mensagem" : cut(msg, 200));
@@ -297,7 +363,7 @@ public final class ClaudeCodeProvider implements LlmProvider {
 
     private static String notFound(LlmConfig cfg) {
         return "Claude Code não encontrado (comando \"" + cfg.claudeCommand + "\"). Instale pelo site claude.com/claude-code, abra um terminal, rode "
-                + "\"claude\" uma vez para logar e reinicie o Minecraft. Se ele estiver fora do PATH, ponha o caminho completo em ai.claude_command.";
+                + "\"claude\" uma vez para logar e reinicie o jogo. Se ele estiver fora do PATH, ponha o caminho completo em ai.claude_command.";
     }
 
     private static String cut(String s, int n) {
@@ -338,7 +404,7 @@ public final class ClaudeCodeProvider implements LlmProvider {
                 Files.writeString(bat, "@echo off\r\nchcp 65001 >nul\r\ntitle Claude Code - login (Kingdoms AI)\r\n"
                         + "echo Entrando no Claude Code para os suditos do Kingdoms AI...\r\n"
                         + "call \"" + exe + "\" auth login\r\n"
-                        + "echo.\r\necho Pronto. Volte ao Minecraft e clique em \"Testar IA\".\r\npause\r\n", StandardCharsets.UTF_8);
+                        + "echo.\r\necho Pronto. Volte ao jogo e clique em \"Testar IA\".\r\npause\r\n", StandardCharsets.UTF_8);
                 // "start" abre uma janela nova; o .bat é relativo à pasta de trabalho (sem espaços para o cmd.exe).
                 new ProcessBuilder("cmd.exe", "/c", "start", "\"Claude Code\"", bat.getFileName().toString())
                         .directory(workDir.toFile()).start();
