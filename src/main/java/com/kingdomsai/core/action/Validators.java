@@ -36,6 +36,7 @@ public final class Validators {
         if (r.type() != ActionType.GIVE && (amount < 1 || amount > 20)) return ActionResult.reject("invalid_param", "amount deve estar entre 1 e 20.");
         switch (r.type()) {
             case BUILD -> {
+                if (isProgram(r)) return null;
                 if (r.param("deadline") != null && com.kingdomsai.core.construction.ConstructionSystem.parseDuration(r.param("deadline")) < 0)
                     return ActionResult.reject("invalid_param", "Prazo inválido: " + r.param("deadline") + " (use 30s, 5m, 2h, 1d ou amanha).");
                 if (com.kingdomsai.core.construction.VillageWall.isWallRequest(r.param("blueprint"))) {
@@ -145,6 +146,15 @@ public final class Validators {
         }
         return null;
     };
+
+    /** BUILD blueprint=program: obra composta pelo arquiteto (catedral, mosteiro, fortaleza). */
+    public static boolean isProgram(ActionRequest r) {
+        return r.type() == ActionType.BUILD && ("program".equalsIgnoreCase(r.param("blueprint")) || isWatchtowers(r));
+    }
+
+    public static boolean isWatchtowers(ActionRequest r) {
+        return r.type() == ActionType.BUILD && "watchtowers".equalsIgnoreCase(r.param("blueprint"));
+    }
 
     public static boolean isCustom(ActionRequest r) {
         String b = r.param("blueprint");
@@ -665,6 +675,16 @@ public final class Validators {
         int amount = r.intParam("amount", 1);
         switch (r.type()) {
             case BUILD -> {
+                if (isWatchtowers(r)) {
+                    c.put(ResourceType.STONE, 40 * Math.max(1, r.intParam("amount", 4)));
+                    break;
+                }
+                if (isProgram(r)) {
+                    var res = com.kingdomsai.core.construction.program.ProgramCompiler.compile(
+                            com.kingdomsai.core.construction.program.DefaultPrograms.forText(r.param("text") == null ? r.param("kind") : r.param("text")));
+                    if (res.ok()) c.putAll(res.blueprint().cost());
+                    break;
+                }
                 if (com.kingdomsai.core.construction.VillageWall.isWallRequest(r.param("blueprint"))) {
                     Blueprint wall = com.kingdomsai.core.construction.VillageWall.generate(core, core.kingdom(r.kingdomId()), r.intParam("height", 4));
                     c.putAll(wall.cost());

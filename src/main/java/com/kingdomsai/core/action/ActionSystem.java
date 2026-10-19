@@ -181,7 +181,21 @@ public final class ActionSystem {
         return null;
     }
 
+    private ActionResult buildProgram(Kingdom k, ActionRequest r) {
+        if (Validators.isWatchtowers(r)) {
+            var made = core.architect().watchtowers(k, Math.max(1, r.intParam("amount", 4)));
+            return made.isEmpty() ? ActionResult.reject("no_site", "Não achei pontos altos livres na fronteira para torres de vigia.")
+                    : ActionResult.ok(made.size() + " torre(s) de vigia planejada(s) nos pontos mais altos da fronteira.");
+        }
+        var p = core.architect().defaultFor(r.param("text") != null ? r.param("text") : r.param("kind"));
+        var res = com.kingdomsai.core.construction.program.ProgramCompiler.compile(p);
+        if (!res.ok()) return ActionResult.reject("invalid_param", "Programa inválido: " + String.join("; ", res.errors()));
+        var out = core.architect().finishCompiled(k, p, res, "regras", 0);
+        return out.ok() ? ActionResult.ok(out.message()) : ActionResult.reject("no_site", out.message());
+    }
+
     private ActionResult build(Kingdom k, ActionRequest r) {
+        if (Validators.isProgram(r)) return buildProgram(k, r);
         if (com.kingdomsai.core.construction.VillageWall.isWallRequest(r.param("blueprint"))) return buildWall(k, r);
         var spec = Validators.isCustom(r) ? com.kingdomsai.core.construction.ParametricBlueprints.spec(r.params()) : null;
         Blueprint bp = spec != null ? core.registerSpec(spec) : BlueprintLibrary.find(r.param("blueprint"));

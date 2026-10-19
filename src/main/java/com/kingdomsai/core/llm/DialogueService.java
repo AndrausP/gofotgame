@@ -115,6 +115,11 @@ public final class DialogueService {
         npc.relationTo(playerId).adjust(1, 1, 0, 0, 1);
         core.bus().publish(core.tick(), EventType.NPC_TALKED, GameEvent.Severity.INFO, npc.kingdomId, npc.id,
                 playerName + " conversou com " + npc.name + ".", Map.of("player", playerId.toString()));
+        if (own && com.kingdomsai.core.construction.program.DefaultPrograms.isProgramRequest(text)) {
+            core.architect().design(pk, text, o -> callback.accept(new Reply(npc.name, o.ok() ? "Sim, Majestade, vou projetar isso." : "Majestade...",
+                    List.of((o.ok() ? "✓ BUILD: " : "✗ BUILD: ") + o.message()), o.source(), false, "")));
+            return;
+        }
         LlmRequest req = core.contextBuilder().npcDialogue(pk, npc, text);
         npc.lastLlmCall = "npc_dialogue @" + core.tick();
         UUID kingdomForActions = own ? pk.id : null;
@@ -139,6 +144,11 @@ public final class DialogueService {
         }
         Npc adv = core.advisor().advisorNpc(k);
         if (handlePending(playerId, adv != null ? adv.name + " (Conselheiro)" : "Conselho", text, callback)) return;
+        if (com.kingdomsai.core.construction.program.DefaultPrograms.isProgramRequest(text)) {
+            core.architect().design(k, text, o -> callback.accept(new Reply(adv != null ? adv.name + " (Conselheiro)" : "Conselho",
+                    o.ok() ? "Projeto aprovado, Majestade." : "Não foi possível.", List.of((o.ok() ? "✓ BUILD: " : "✗ BUILD: ") + o.message()), o.source(), false, "")));
+            return;
+        }
         LlmRequest req = core.contextBuilder().councilOrder(k, text);
         core.llm().submit(req).thenAcceptAsync(res -> {
             Plan plan = res.fallback() || "mock".equals(res.provider()) ? res.plan() : withExplicitOrders(k, null, text, res.plan());

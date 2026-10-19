@@ -278,7 +278,7 @@ flowchart TD
 
 ---
 
-### F5 — Arquiteto: ordens de construção em linguagem natural
+### F5 — Arquiteto: ordens de construção em linguagem natural — **Feita em parte** (F5.1–F5.3 completas; F5.4 só `watchtowers`; `wall_ring` de território, `road` e lotes ficaram pendentes — a muralha da vila já existia)
 
 **Objetivo:** "Construa uma catedral gótica com duas torres frontais, nave central, vitrais, contrafortes e claustro" vira obra real, sem uma função por edifício.
 

@@ -25,6 +25,7 @@ public final class Schemas {
      */
     public static String forPurpose(String purpose, boolean canPropose) {
         if ("rival_king".equals(purpose)) return rivalKing(canPropose);
+        if ("architect".equals(purpose)) return architect();
         List<String> types = switch (purpose == null ? "" : purpose) {
             case "agenda" -> List.of("LIFE");
             case "conversa" -> List.of("LINE");
@@ -38,6 +39,47 @@ public final class Schemas {
     public static final List<String> RIVAL_ACTIONS = List.of("NEGOTIATE", "GIVE", "DECLARE_WAR", "MAKE_PEACE", "RECRUIT", "TAX");
     public static final List<String> RIVAL_STANCES = List.of("aggressive", "defensive", "mercantile", "isolationist");
     public static final List<String> RIVAL_DECISIONS = List.of("aceitar", "recusar", "contraproposta", "ignorar", "declarar_guerra", "pedir_paz", "reforcar", "nenhuma");
+
+    /** Programa arquitetônico (módulos validados depois pelo compilador). */
+    public static String architect() {
+        JsonObject str = new JsonObject();
+        str.addProperty("type", "string");
+        JsonObject num = new JsonObject();
+        num.addProperty("type", "integer");
+        JsonObject mp = new JsonObject();
+        for (String f : new String[]{"id", "type", "roof", "attach", "side", "axis", "material"}) mp.add(f, str);
+        for (String f : new String[]{"w", "d", "h", "r", "floors", "spacing", "height", "length"}) mp.add(f, num);
+        JsonObject mod = new JsonObject();
+        mod.addProperty("type", "object");
+        mod.add("properties", mp);
+        mod.add("required", strings("id", "type"));
+        JsonObject mods = new JsonObject();
+        mods.addProperty("type", "array");
+        mods.addProperty("maxItems", BuildingProgramLimits.MAX_MODULES);
+        mods.add("items", mod);
+        JsonObject sp = new JsonObject();
+        sp.add("width", num);
+        sp.add("depth", num);
+        sp.add("facing", str);
+        JsonObject site = new JsonObject();
+        site.addProperty("type", "object");
+        site.add("properties", sp);
+        JsonObject props = new JsonObject();
+        props.add("style", str);
+        props.add("name", str);
+        props.add("site", site);
+        props.add("modules", mods);
+        props.add("notes", str);
+        JsonObject root = new JsonObject();
+        root.addProperty("type", "object");
+        root.add("properties", props);
+        root.add("required", strings("style", "modules"));
+        return root.toString();
+    }
+
+    private static final class BuildingProgramLimits {
+        static final int MAX_MODULES = com.kingdomsai.core.construction.program.BuildingProgram.MAX_MODULES;
+    }
 
     /** Decisão de um rei rival (seção 4.2 do plano): decision, stance, stance_days, actions, message_to_target, reason. */
     public static String rivalKing(boolean canPropose) {

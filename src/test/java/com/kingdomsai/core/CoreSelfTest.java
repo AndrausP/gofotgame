@@ -224,6 +224,11 @@ public final class CoreSelfTest {
         passed += qu[0];
         failed += qu[1];
 
+        // 18d. Programa arquitetônico: compilador, arquiteto, obra no mundo voxel
+        int[] pg = ProgramSelfTest.run();
+        passed += pg[0];
+        failed += pg[1];
+
         // 18c. Reis rivais com conselho LLM, ofertas ao jogador e tratados com consequência
         int[] rv = RivalSelfTest.run();
         passed += rv[0];

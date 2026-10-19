@@ -285,18 +285,25 @@ public final class LlmGateway {
      * global deixando folga para as falas do rei. Devolve null se não deu (quem chama usa as próprias regras).
      */
     public CompletableFuture<Plan> background(LlmRequest req) {
+        return backgroundRaw(req).thenApply(raw -> {
+            if (raw == null) return null;
+            try {
+                return Plan.parse(raw);
+            } catch (RuntimeException e) {
+                return null;
+            }
+        });
+    }
+
+    /** Como {@link #background}, devolvendo o texto bruto do modelo (null se não deu). */
+    public CompletableFuture<String> backgroundRaw(LlmRequest req) {
         if (!live()) return CompletableFuture.completedFuture(null);
         long now = System.currentTimeMillis();
         while (!calls.isEmpty() && now - calls.peekFirst() > 60_000) calls.pollFirst();
         if (calls.size() >= Math.max(1, config.maxCallsPerMinute - 5)) return CompletableFuture.completedFuture(null);
         calls.addLast(now);
         return dispatch(req, true).handle((res, err) -> {
-            if (err != null) return null; // falha ou pedido vencido: quem chamou segue pelas regras
-            try {
-                return Plan.parse(res.text());
-            } catch (RuntimeException e) {
-                return null;
-            }
+            return err != null ? null : res.text(); // falha ou pedido vencido: quem chamou segue pelas regras
         });
     }
 

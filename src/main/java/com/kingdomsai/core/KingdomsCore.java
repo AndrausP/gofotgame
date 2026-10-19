@@ -59,6 +59,7 @@ public final class KingdomsCore {
     private final DiplomacySystem diplomacy;
     private final KingdomDirector director;
     private final com.kingdomsai.core.ai.RivalCouncil rivals;
+    private final com.kingdomsai.core.construction.program.Architect architect;
     private final NpcScheduler scheduler;
     private final Advisor advisor;
     private final ContextBuilder contextBuilder;
@@ -94,6 +95,7 @@ public final class KingdomsCore {
         this.diplomacy = new DiplomacySystem(this);
         this.director = new KingdomDirector(this);
         this.rivals = new com.kingdomsai.core.ai.RivalCouncil(this);
+        this.architect = new com.kingdomsai.core.construction.program.Architect(this);
         this.scheduler = new NpcScheduler(this);
         this.advisor = new Advisor(this);
         this.contextBuilder = new ContextBuilder(this);
@@ -469,6 +471,10 @@ public final class KingdomsCore {
 
     public KingdomDirector director() {
         return director;
+    }
+
+    public com.kingdomsai.core.construction.program.Architect architect() {
+        return architect;
     }
 
     public com.kingdomsai.core.ai.RivalCouncil rivals() {
