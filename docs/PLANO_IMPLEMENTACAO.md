@@ -308,7 +308,7 @@ flowchart TD
 
 ---
 
-### F6 — Ordens militares compostas
+### F6 — Ordens militares compostas — **Feita em parte** (DEFEND como guarnição via MOVE, executor de dependências `MilitaryOrders` com plano-padrão; pendentes: LLM `military`, força de reação e replanejamento/reparo por regra)
 
 **Objetivo:** "Construa uma muralha ao redor do reino, ponha arqueiros nas torres, soldados nos portões e uma força de reação" vira um plano executável.
 
@@ -320,7 +320,7 @@ flowchart TD
 
 ---
 
-### F7 — Distribuição: chave de API, Ollama e marca
+### F7 — Distribuição: chave de API, Ollama e marca — **Feita em parte** (F7.1 `AnthropicApiProvider` + opção "Chave de API" no painel, chave nunca salva; pendentes: F7.2 `--bare`, F7.3 custo por opção no painel, F7.5 llama.cpp)
 
 **Objetivo:** outras pessoas podem jogar sem depender do login de assinatura de ninguém.
 
@@ -333,7 +333,7 @@ flowchart TD
 
 ---
 
-### F8 — Pendências do mundo (opcional, depois das anteriores)
+### F8 — Pendências do mundo (opcional, depois das anteriores) — **Não iniciada**
 
 Do `PLANO_GODOT.md`: salvar fogos e clima em andamento; cavernas e mais biomas no `WorldGen`; fauna/monstros usando `PhysicalPort.threatsNear`; sons e efeitos de quebra; **uma sessão longa de jogo** com relatório do que pareceu errado (a verificação até hoje foi por testes).
 

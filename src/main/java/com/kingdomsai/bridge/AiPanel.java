@@ -30,6 +30,7 @@ public final class AiPanel {
     private static final List<String[]> PROVIDERS = List.of(
             new String[]{"mock", "Regras"},
             new String[]{"claude_code", "Claude"},
+            new String[]{"anthropic_api", "Chave de API"},
             new String[]{"ollama", "Ollama"});
     private static final Pattern LOCAL_MODEL = Pattern.compile("[A-Za-z0-9._:\\-/]{1,64}");
     private static final Pattern ENDPOINT = Pattern.compile("https?://[A-Za-z0-9.\\-]{1,100}(:\\d{1,5})?(/[A-Za-z0-9._\\-/]{0,100})?");

@@ -23,6 +23,7 @@ public final class LlmGateway {
     private LlmConfig config = new LlmConfig();
     private LlmProvider provider;
     private LlmProvider claudeCode = new ClaudeCodeProvider();
+    private LlmProvider api = new AnthropicApiProvider();
     private final ArrayDeque<Long> calls = new ArrayDeque<>();
     private volatile long downUntil;
     private volatile String lastError = "";
@@ -200,6 +201,7 @@ public final class LlmGateway {
             case "ollama" -> new HttpProviders.Ollama();
             case "openai", "lmstudio", "custom" -> new HttpProviders.OpenAiCompatible();
             case ClaudeCodeProvider.NAME, "claude", "claudecode" -> claudeCode;
+            case AnthropicApiProvider.NAME -> api;
             default -> mock;
         };
         downUntil = 0;
@@ -207,6 +209,12 @@ public final class LlmGateway {
 
     public LlmConfig config() {
         return config;
+    }
+
+    /** Troca o provider de API (testes usam um servidor falso). */
+    public void setApiProvider(LlmProvider p) {
+        this.api = p;
+        configure(config);
     }
 
     /** Troca o executor do Claude Code (testes usam um processo falso). */
@@ -219,7 +227,7 @@ public final class LlmGateway {
         if (!config.enabled) return "LLM desligada (modo regras)";
         if (provider == mock) return "Provider: regras (mock)";
         long now = System.currentTimeMillis();
-        String s = provider == claudeCode
+        String s = provider == claudeCode || provider == api
                 ? "Provider: Claude Code · modelos " + config.claudeNpcModel + " (súditos) / " + config.claudeCouncilModel + " (conselho) · comando " + config.claudeCommand
                 : "Provider: " + provider.name() + " · modelo " + config.model + " · " + config.endpoint;
         if (overBudget()) s += String.format(java.util.Locale.ROOT, " · orçamento de IA atingido (US$ %.2f); usando regras", ledger.totalCostUsd());

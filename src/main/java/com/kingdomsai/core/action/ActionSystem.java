@@ -138,6 +138,7 @@ public final class ActionSystem {
                 case PETITION -> core.civic().decide(k, Integer.parseInt(r.param("petition").replace("#", "").trim()),
                         r.param("verdict").trim().toLowerCase().startsWith("a"), null);
                 case MOVE -> move(k, r);
+                case DEFEND -> defend(k, r);
                 case RETREAT -> ActionResult.ok(core.warfare().retreat(core.warfare().find(k.id, r.param("campaign"))));
                 case SETTLE -> settle(k, r);
                 case PURGE -> {
@@ -403,6 +404,27 @@ public final class ActionSystem {
     }
 
     /** "Vão para a praça", "reúna a tropa no quartel", "fiquem aqui": vão de verdade e esperam lá. */
+    /** Guarnição: resolve o local (portões, torres, quartel...) e leva os soldados até lá (MOVE), registrando regra e papel. */
+    private ActionResult defend(Kingdom k, ActionRequest r) {
+        String where = Text.norm(r.param("where"));
+        String to = r.param("where");
+        if (where.startsWith("tor")) {
+            Building tower = null;
+            for (Building b : core.buildings(k.id))
+                if (b.isComplete() && b.origin != null && b.blueprint() != null && Text.norm(b.blueprint().displayName()).contains("torre")) tower = b;
+            if (tower == null) return ActionResult.reject("not_found", "Não há torre pronta para guarnecer.");
+            to = tower.centerPos().x() + " " + tower.centerPos().z();
+        } else if (where.startsWith("port")) {
+            var bd = com.kingdomsai.core.construction.VillageWall.bounds(core, k);
+            to = ((bd.x0() + bd.x1()) / 2) + " " + bd.z0();
+        }
+        ActionResult m = move(k, ActionRequest.of(k.id, r.actorId(), r.actorKind(), ActionType.MOVE, r.source(), "to", to, "who", "soldados",
+                "minutes", r.param("minutes") == null ? "20" : r.param("minutes"), "order", "guarnição " + where));
+        if (!m.ok()) return m;
+        String role = r.param("role") == null ? "soldier" : r.param("role"), rule = r.param("rule") == null ? "hold" : r.param("rule");
+        return ActionResult.ok("Guarnição (" + role + ", regra " + rule + ") em " + where + ": " + m.message());
+    }
+
     private ActionResult move(Kingdom k, ActionRequest r) {
         Validators.Target t = Validators.place(core, k, r, r.param("to"));
         List<Npc> who = Validators.movers(core, k, r);

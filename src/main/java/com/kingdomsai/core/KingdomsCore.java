@@ -60,6 +60,7 @@ public final class KingdomsCore {
     private final KingdomDirector director;
     private final com.kingdomsai.core.ai.RivalCouncil rivals;
     private final com.kingdomsai.core.construction.program.Architect architect;
+    private final com.kingdomsai.core.military.MilitaryOrders militaryOrders;
     private final NpcScheduler scheduler;
     private final Advisor advisor;
     private final ContextBuilder contextBuilder;
@@ -96,6 +97,7 @@ public final class KingdomsCore {
         this.director = new KingdomDirector(this);
         this.rivals = new com.kingdomsai.core.ai.RivalCouncil(this);
         this.architect = new com.kingdomsai.core.construction.program.Architect(this);
+        this.militaryOrders = new com.kingdomsai.core.military.MilitaryOrders(this);
         this.scheduler = new NpcScheduler(this);
         this.advisor = new Advisor(this);
         this.contextBuilder = new ContextBuilder(this);
@@ -216,6 +218,7 @@ public final class KingdomsCore {
                 director.tick();
                 rivals.tick(); // conselho LLM dos reis rivais: raro, por evento (sem IA ao vivo não faz nada)
             }
+            militaryOrders.tick(); // ordens militares compostas: passos com dependências
             opening.tick(); // roteiro de início dos reinos dos jogadores
         }
         bus.dispatch();
@@ -471,6 +474,10 @@ public final class KingdomsCore {
 
     public KingdomDirector director() {
         return director;
+    }
+
+    public com.kingdomsai.core.military.MilitaryOrders militaryOrders() {
+        return militaryOrders;
     }
 
     public com.kingdomsai.core.construction.program.Architect architect() {

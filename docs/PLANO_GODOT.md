@@ -7,6 +7,7 @@ Objetivo: um jogo próprio, no Godot, onde uma sociedade de NPCs movidos por reg
 Roteiro de implementação por fases em `docs/PLANO_IMPLEMENTACAO.md` (F0–F8). Fases feitas:
 
 - **F0 — Build e testes confiáveis: Feita** (Gradle, `jogar.sh`, semente reproduzível `-Dkingdoms.seed`, `CLAUDE.md`).
+- **F5–F7 parciais** (arquiteto/programas arquitetônicos, ordens militares compostas, provider por chave de API): ver marcações em `docs/PLANO_IMPLEMENTACAO.md`.
 - **F4 — Conselho LLM dos reis rivais: Feita** (`RivalCouncil`, ofertas ao jogador, tratados com termos e consequências, postura, crônica).
 - **F3 — Latência e custo medidos: Feita** (`docs/MEDICOES_IA.md`; fila com prioridade/dedup/vencimento no `LlmGateway`).
 - **F2 — Painel de IA no Godot: Feita** (ops `ai_*` na ponte, `godot/ai_panel.gd`, smoke cobre o painel).

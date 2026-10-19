@@ -257,7 +257,7 @@ public final class ClaudeCodeSelfTest {
         List<String> allowed = new ArrayList<>();
         enumTypes.forEach(e -> allowed.add(e.getAsString()));
         check("F1.3: o enum de ações = ações implementadas (sem as de fases futuras)", allowed.contains("BUILD") && allowed.contains("SUMMON")
-                && !allowed.contains("TRADE") && !allowed.contains("DEFEND") && !allowed.contains("TALK"));
+                && !allowed.contains("TRADE") && !allowed.contains("SCOUT") && !allowed.contains("TALK"));
         check("F1.3: schema é JSON válido e seguro para linha de comando", Schemas.safeForCommandLine(schema) && !schema.contains(" "));
         check("F1.3: rei estrangeiro não propõe ações (maxItems 0)", Schemas.forPurpose("npc_dialogue", false).contains("\"maxItems\":0"));
         check("F1.3: agenda só aceita LIFE; conversa só LINE", Schemas.forPurpose("agenda", true).contains("\"enum\":[\"LIFE\"]")

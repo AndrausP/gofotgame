@@ -40,12 +40,17 @@ public final class LlmConfig {
     private static final Set<String> NPC_PURPOSES = Set.of("agenda", "conversa", "npc_dialogue", "test");
 
     public boolean isClaudeCode() {
-        return provider != null && provider.equalsIgnoreCase(ClaudeCodeProvider.NAME);
+        return provider != null && (provider.equalsIgnoreCase(ClaudeCodeProvider.NAME) || isApi());
+    }
+
+    /** Provider por chave de API da Anthropic (usa os mesmos modelos claude* do Claude Code). */
+    public boolean isApi() {
+        return provider != null && provider.equalsIgnoreCase(AnthropicApiProvider.NAME);
     }
 
     /** O Claude Code abre um processo por pergunta: nunca menos de 60 s. */
     public int effectiveTimeoutMs() {
-        return isClaudeCode() ? Math.max(timeoutMs, ClaudeCodeProvider.MIN_TIMEOUT_MS) : timeoutMs;
+        return provider != null && provider.equalsIgnoreCase(ClaudeCodeProvider.NAME) ? Math.max(timeoutMs, ClaudeCodeProvider.MIN_TIMEOUT_MS) : timeoutMs;
     }
 
     /** Pedido da vida dos súditos (modelo pequeno) ou decisão rara do conselho (modelo maior)? */

@@ -229,6 +229,16 @@ public final class CoreSelfTest {
         passed += pg[0];
         failed += pg[1];
 
+        // 18e. Ordens militares compostas
+        int[] mo = MilitaryOrdersSelfTest.run();
+        passed += mo[0];
+        failed += mo[1];
+
+        // 18f. Provider por chave de API
+        int[] ap = ApiProviderSelfTest.run();
+        passed += ap[0];
+        failed += ap[1];
+
         // 18c. Reis rivais com conselho LLM, ofertas ao jogador e tratados com consequência
         int[] rv = RivalSelfTest.run();
         passed += rv[0];
