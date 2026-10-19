@@ -232,7 +232,7 @@ flowchart TD
 
 ---
 
-### F3 — Latência e custo medidos e reduzidos
+### F3 — Latência e custo medidos e reduzidos — **Feita** (F3.3: pré-aquecimento medido e descartado; ver `docs/MEDICOES_IA.md`)
 
 **Objetivo:** números reais antes de pôr LLM em mais lugares.
 
@@ -258,7 +258,7 @@ flowchart TD
 
 ---
 
-### F4 — Conselho LLM dos reis rivais (raro, por evento)
+### F4 — Conselho LLM dos reis rivais (raro, por evento) — **Feita**
 
 **Objetivo:** reis com personalidade que negociam e reagem, sem chamar a LLM a cada tick.
 
