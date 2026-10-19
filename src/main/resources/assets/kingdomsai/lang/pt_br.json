@@ -1,0 +1,8 @@
+{
+  "entity.kingdomsai.npc": "Súdito",
+  "key.kingdomsai.manager": "Manager Mode (câmera livre do rei)",
+  "key.categories.kingdomsai": "Kingdoms AI",
+  "key.kingdomsai.interface": "Interface do Manager (cursor)",
+  "key.kingdomsai.call": "Chamar súdito (o que você mira ou o selecionado)",
+  "item.kingdomsai.kingdom_marker": "Bandeira do Reino"
+}
