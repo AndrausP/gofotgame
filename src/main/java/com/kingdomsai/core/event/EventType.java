@@ -91,5 +91,11 @@ public enum EventType {
     WEATHER_CHANGED,
     EXPLOSION,
     LAW_ENFORCED,
-    FLOOD_STARTED
+    FLOOD_STARTED,
+    /** Um tratado foi rompido (guerra declarada contra o parceiro, tributo não pago). */
+    TREATY_BROKEN,
+    /** Mensagem de um rei de IA para outro reino (contraproposta, ameaça, aviso). */
+    RIVAL_MESSAGE,
+    /** Um rei de IA fez uma oferta ao jogador (veja /k offers). */
+    OFFER_MADE
 }

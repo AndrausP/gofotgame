@@ -29,6 +29,9 @@ public final class WorldState {
     public Map<String, Diplomacy.Link> links = new HashMap<>();
     public Map<String, Diplomacy.Attitude> attitudes = new HashMap<>();
     public List<Diplomacy.Treaty> treaties = new ArrayList<>();
+    /** Ofertas dos reis de IA ao jogador, e o contador do número curto. */
+    public List<Diplomacy.Offer> offers = new ArrayList<>();
+    public int offerCounter;
     /** Crônica do mundo ("Ano 1: Reino de Andraus fundado."). */
     /** Plantas paramétricas do mundo (guardamos só os parâmetros; a planta é regerada ao carregar). */
     public Map<String, com.kingdomsai.core.construction.ParametricBlueprints.Spec> blueprintSpecs = new LinkedHashMap<>();

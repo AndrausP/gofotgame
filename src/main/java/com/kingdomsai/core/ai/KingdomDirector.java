@@ -33,6 +33,43 @@ public final class KingdomDirector {
         return lastReasoning.getOrDefault(k, "(ainda não avaliado)");
     }
 
+    /** Guarda a última decisão do conselho LLM do rei rival, para "debug ai". */
+    public void noteCouncil(UUID k, String decision) {
+        lastCouncil.put(k, decision);
+    }
+
+    private final Map<UUID, String> lastCouncil = new HashMap<>();
+
+    /** Quanto a postura do rei pesa em cada objetivo (1.0 = sem efeito). A postura vem do conselho LLM e vence em stanceUntilTick. */
+    static double stanceWeight(Kingdom k, long now, String goal) {
+        if (k.stance == null || k.stance.isBlank() || k.stanceUntilTick <= now) return 1.0;
+        return switch (k.stance) {
+            case "aggressive" -> switch (goal) {
+                case "FORTIFY", "CAMPAIGN", "EXPAND" -> 1.4;
+                case "INCREASE_FOOD", "BUILD_HOUSING" -> 0.9;
+                default -> 1.0;
+            };
+            case "defensive" -> switch (goal) {
+                case "FORTIFY" -> 1.3;
+                case "CAMPAIGN", "EXPAND" -> 0.5;
+                default -> 1.0;
+            };
+            case "mercantile" -> switch (goal) {
+                case "INCREASE_FOOD", "BALANCE_WORKFORCE", "BUILD_HOUSING" -> 1.2;
+                case "CAMPAIGN" -> 0.4;
+                case "FORTIFY" -> 0.9;
+                default -> 1.0;
+            };
+            case "isolationist" -> switch (goal) {
+                case "EXPAND" -> 0.4;
+                case "CAMPAIGN" -> 0.3;
+                case "FORTIFY" -> 1.1;
+                default -> 1.0;
+            };
+            default -> 1.0;
+        };
+    }
+
     public void tick() {
         for (Kingdom k : List.copyOf(core.state().kingdoms.values())) {
             if (k.isPlayerKingdom()) continue;
@@ -93,15 +130,21 @@ public final class KingdomDirector {
         boolean needStone = k.get(ResourceType.STONE) < 40 && core.count(k.id, Profession.MINER) < 2;
         ps.add(new Priority("BALANCE_WORKFORCE", needBuilder || needWood || needStone ? 0.6 : 0.05,
                 needBuilder ? "sem construtores" : needWood ? "pouca madeira" : needStone ? "pouca pedra" : "ok"));
-        ps.sort(Comparator.comparingDouble(Priority::score).reversed());
-        return ps;
+        long now = core.tick();
+        List<Priority> weighted = new ArrayList<>();
+        for (Priority p : ps) {
+            double w = stanceWeight(k, now, p.goal());
+            weighted.add(w == 1.0 ? p : new Priority(p.goal(), p.score() * w, p.reason() + " (postura " + k.stance + " ×" + String.format(Locale.ROOT, "%.1f", w) + ")"));
+        }
+        weighted.sort(Comparator.comparingDouble(Priority::score).reversed());
+        return weighted;
     }
 
     private void run(Kingdom k) {
         List<Priority> ps = evaluate(k);
         StringBuilder why = new StringBuilder();
         for (Priority p : ps) why.append(p.goal()).append('=').append(String.format(Locale.ROOT, "%.2f", p.score())).append(" (").append(p.reason()).append(") ");
-        lastReasoning.put(k.id, why.toString());
+        lastReasoning.put(k.id, why + (lastCouncil.containsKey(k.id) ? "| conselho: " + lastCouncil.get(k.id) : ""));
         int actionsTaken = 0;
         for (Priority p : ps) {
             if (p.goal().equals("CAMPAIGN")) {

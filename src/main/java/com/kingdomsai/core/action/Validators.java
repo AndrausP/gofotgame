@@ -235,6 +235,12 @@ public final class Validators {
             case ATTACK, OCCUPY, SETTLE -> {
                 Target t = attackTarget(core, k, r);
                 if (t.error() != null) return ActionResult.reject("invalid_target", t.error());
+                if (r.type() != ActionType.SETTLE && r.actorKind() != ActionRequest.ActorKind.PLAYER && t.owner() != null) {
+                    var bound = core.diplomacy().binding(k.id, t.owner().id);
+                    if (bound != null)
+                        return ActionResult.reject("treaty_in_force", "O " + bound.type.display.toLowerCase() + " com " + t.owner().name
+                                + " ainda vale: a IA não o rompe atacando.");
+                }
                 if (r.type() == ActionType.SETTLE) {
                     if (settlers(core, k, r.intParam("amount", 3)).isEmpty())
                         return ActionResult.reject("not_enough_people", "Não há civis livres para mandar como colonos.");
@@ -348,6 +354,12 @@ public final class Validators {
                 if (t.id.equals(k.id)) return ActionResult.reject("invalid_target", "Não dá para negociar consigo mesmo.");
                 if (r.type() == ActionType.DECLARE_WAR && core.diplomacy().link(k.id, t.id).state == com.kingdomsai.core.diplomacy.Diplomacy.State.WAR)
                     return ActionResult.reject("invalid_target", "Já estamos em guerra com " + t.name + ".");
+                if (r.type() == ActionType.DECLARE_WAR && r.actorKind() != ActionRequest.ActorKind.PLAYER) {
+                    var bound = core.diplomacy().binding(k.id, t.id);
+                    if (bound != null)
+                        return ActionResult.reject("treaty_in_force", "O " + bound.type.display.toLowerCase() + " com " + t.name
+                                + " ainda vale (até o dia " + (bound.expiresTick / 24000 + 1) + "): só o rei jogador pode rompê-lo.");
+                }
                 if (r.type() == ActionType.NEGOTIATE && r.param("treaty") != null
                         && com.kingdomsai.core.diplomacy.Diplomacy.TreatyType.parse(r.param("treaty")) == null)
                     return ActionResult.reject("invalid_param", "Tratado desconhecido: " + r.param("treaty") + ".");

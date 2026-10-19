@@ -22,7 +22,8 @@ public final class Diplomacy {
         TRADE_AGREEMENT("Acordo comercial"),
         DEFENSIVE_ALLIANCE("Aliança defensiva"),
         TRIBUTE("Tributo"),
-        OPEN_BORDERS("Fronteiras abertas");
+        OPEN_BORDERS("Fronteiras abertas"),
+        DYNASTIC_MARRIAGE("Casamento dinástico");
         public final String display;
 
         TreatyType(String display) {
@@ -36,6 +37,7 @@ public final class Diplomacy {
             if (n.contains("alian") || n.contains("alliance")) return DEFENSIVE_ALLIANCE;
             if (n.contains("tribut")) return TRIBUTE;
             if (n.contains("fronteir") || n.contains("border")) return OPEN_BORDERS;
+            if (n.contains("casament") || n.contains("marriage") || n.contains("dinast")) return DYNASTIC_MARRIAGE;
             for (TreatyType t : values()) if (t.name().equalsIgnoreCase(n)) return t;
             return null;
         }
@@ -79,12 +81,32 @@ public final class Diplomacy {
         public long startTick;
         public long expiresTick;
         public int violations;
+        /** Anotação de acompanhamento (TRIBUTE: quem paga é b; guarda o último pagamento). */
+        public String note = "";
 
         public Treaty() {}
 
         public boolean involves(UUID k) {
             return k.equals(a) || k.equals(b);
         }
+    }
+
+    /**
+     * Proposta de um rei de IA ao jogador: o jogador aceita ou recusa (/k offers, /k offer accept|refuse N).
+     * Troca: {@code from} dá giveAmount de give e quer wantAmount de want. Tratado: treaty preenchido.
+     */
+    public static final class Offer {
+        public int number;
+        public UUID from, to;
+        public String treaty = "";
+        public String give = "", want = "";
+        public int giveAmount, wantAmount;
+        public String message = "";
+        public long createdTick, expiresTick;
+        /** PENDING | ACCEPTED | REFUSED | EXPIRED */
+        public String status = "PENDING";
+
+        public Offer() {}
     }
 
     public static String pairKey(UUID x, UUID y) {

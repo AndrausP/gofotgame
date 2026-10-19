@@ -24,13 +24,71 @@ public final class Schemas {
      * Finalidades desconhecidas ganham o schema genérico (tipo de ação livre).
      */
     public static String forPurpose(String purpose, boolean canPropose) {
+        if ("rival_king".equals(purpose)) return rivalKing(canPropose);
         List<String> types = switch (purpose == null ? "" : purpose) {
             case "agenda" -> List.of("LIFE");
             case "conversa" -> List.of("LINE");
-            case "npc_dialogue", "council", "rival_king", "military", "repair" -> kingActionTypes();
+            case "npc_dialogue", "council", "military", "repair" -> kingActionTypes();
             default -> null;
         };
         return plan(types, canPropose);
+    }
+
+    /** Ações que um rei de IA (conselho dos rivais) pode propor. GOAL e as demais ficam com o Utility AI. */
+    public static final List<String> RIVAL_ACTIONS = List.of("NEGOTIATE", "GIVE", "DECLARE_WAR", "MAKE_PEACE", "RECRUIT", "TAX");
+    public static final List<String> RIVAL_STANCES = List.of("aggressive", "defensive", "mercantile", "isolationist");
+    public static final List<String> RIVAL_DECISIONS = List.of("aceitar", "recusar", "contraproposta", "ignorar", "declarar_guerra", "pedir_paz", "reforcar", "nenhuma");
+
+    /** Decisão de um rei rival (seção 4.2 do plano): decision, stance, stance_days, actions, message_to_target, reason. */
+    public static String rivalKing(boolean canPropose) {
+        JsonObject decision = new JsonObject();
+        decision.addProperty("type", "string");
+        decision.add("enum", strings(RIVAL_DECISIONS.toArray(new String[0])));
+        JsonObject stance = new JsonObject();
+        stance.addProperty("type", "string");
+        stance.add("enum", strings(RIVAL_STANCES.toArray(new String[0])));
+        JsonObject days = new JsonObject();
+        days.addProperty("type", "integer");
+        days.addProperty("minimum", 1);
+        days.addProperty("maximum", 30);
+        JsonObject msg = new JsonObject();
+        msg.addProperty("type", "string");
+        msg.addProperty("maxLength", 300);
+        JsonObject reason = new JsonObject();
+        reason.addProperty("type", "string");
+        reason.addProperty("maxLength", 300);
+        JsonObject actions = new JsonObject();
+        actions.addProperty("type", "array");
+        actions.addProperty("maxItems", canPropose ? 3 : 0);
+        if (canPropose) {
+            JsonObject type = new JsonObject();
+            type.addProperty("type", "string");
+            type.add("enum", strings(RIVAL_ACTIONS.toArray(new String[0])));
+            JsonObject params = new JsonObject();
+            params.addProperty("type", "object");
+            JsonObject itemProps = new JsonObject();
+            itemProps.add("type", type);
+            itemProps.add("params", params);
+            JsonObject item = new JsonObject();
+            item.addProperty("type", "object");
+            item.addProperty("additionalProperties", false);
+            item.add("properties", itemProps);
+            item.add("required", strings("type", "params"));
+            actions.add("items", item);
+        }
+        JsonObject props = new JsonObject();
+        props.add("decision", decision);
+        props.add("stance", stance);
+        props.add("stance_days", days);
+        props.add("actions", actions);
+        props.add("message_to_target", msg);
+        props.add("reason", reason);
+        JsonObject root = new JsonObject();
+        root.addProperty("type", "object");
+        root.addProperty("additionalProperties", false);
+        root.add("properties", props);
+        root.add("required", strings("decision", "actions"));
+        return root.toString();
     }
 
     /** {"reply":string,"actions":[{"type":enum,"params":{}}]} — types == null deixa o tipo livre. */

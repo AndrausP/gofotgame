@@ -219,6 +219,16 @@ public final class CoreSelfTest {
         passed += cc[0];
         failed += cc[1];
 
+        // 18b. Fila de IA: prioridade, deduplicação, vencimento, concorrência, processos do claude
+        int[] qu = LlmQueueSelfTest.run();
+        passed += qu[0];
+        failed += qu[1];
+
+        // 18c. Reis rivais com conselho LLM, ofertas ao jogador e tratados com consequência
+        int[] rv = RivalSelfTest.run();
+        passed += rv[0];
+        failed += rv[1];
+
         // 19. Mochila e kit por ofício; trabalho contínuo (lenhador, mineiro, fazendeiro), longe da vista e validações
         int[] lb = LaborSelfTest.run();
         passed += lb[0];

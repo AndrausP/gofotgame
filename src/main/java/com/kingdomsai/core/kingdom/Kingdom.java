@@ -66,6 +66,12 @@ public final class Kingdom {
     /** Pontos marcados pelo rei com a Bandeira do Reino (spawn, praça, mina, bosque). */
     public Map<Marker, Pos> markers = new EnumMap<>(Marker.class);
 
+    /** Postura estratégica do rei de IA (aggressive|defensive|mercantile|isolationist; vazio = nenhuma) até stanceUntilTick. */
+    public String stance = "";
+    public long stanceUntilTick;
+    /** Crônica resumida do reino (300–600 caracteres), atualizada por regra a partir dos eventos marcantes. */
+    public String chronicleSummary = "";
+
     public boolean famine;
     public boolean shortageWarned;
     public boolean housingWarned;

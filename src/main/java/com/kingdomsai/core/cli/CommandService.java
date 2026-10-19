@@ -55,7 +55,7 @@ public final class CommandService {
             "claim", "tax", "law", "diplomacy", "war", "order", "ai", "events", "chronicle", "debug", "replay", "rivals",
             "chains", "chain", "books", "book", "call", "follow", "dismiss", "village", "job", "jobs", "bag", "report", "mark", "marks",
             "attack", "retreat", "settle", "campaigns", "captives", "purge", "enslave", "free", "confirm", "abort", "life", "perf", "roteiro",
-            "petitions", "approve", "reject", "decrees", "decree", "revoke", "civic");
+            "petitions", "approve", "reject", "decrees", "decree", "revoke", "civic", "offers", "offer");
 
     private final KingdomsCore core;
     private Notifier notifier = (p, l) -> {};
@@ -219,6 +219,8 @@ public final class CommandService {
             case "projects", "obras" -> projects(k, out);
             case "army", "exercito" -> army(k, player, a, out);
             case "petitions", "peticoes", "petições" -> petitions(k, out);
+            case "offers", "ofertas" -> offers(k, out);
+            case "offer", "oferta" -> offer(k, a, out);
             case "approve", "aprovar" -> petitionVerdict(k, player, a, true, out);
             case "reject", "rejeitar", "negar" -> petitionVerdict(k, player, a, false, out);
             case "decrees", "decretos", "leis" -> decrees(k, out);
@@ -412,6 +414,7 @@ public final class CommandService {
         out.add("economy · territory · claim [n] · tax <0-4|up|down> · law <conscription|migration> <on|off>");
         out.add("diplomacy list · diplomacy treaty <reino> <tipo> · diplomacy trade <reino> <qtd> <recurso> <qtd> <recurso>");
         out.add("diplomacy gift <reino> <qtd> <recurso> · war declare|peace <reino>");
+        out.add("offers | offer accept <n> | offer refuse <n> — propostas que os reis de IA fazem a você (valem 3 dias)");
         out.add("chains · chain <nº> [stop|resume] · chain new <modelo> [npc=Nome] [k=v...] — rotinas/cadeias de trabalho");
         out.add("  modelos: minerar_ferreiro, plantar_colher, lenha, pedra, escrever topic=..., ler, carta to=Nome text=...");
         out.add("books · book <nº> — livros e cartas do reino");
@@ -922,6 +925,43 @@ public final class CommandService {
                     + (c.captives > 0 ? " · " + c.captives + " cativo(s)" : ""));
             if (!c.result.isBlank()) out.add("   " + c.result);
         }
+    }
+
+    private void offers(Kingdom k, List<String> out) {
+        var all = core.diplomacy().offersFor(k.id);
+        if (all.isEmpty()) {
+            out.add("Nenhuma oferta pendente. Os reis rivais propõem tratados e trocas quando algo os leva a isso.");
+            return;
+        }
+        out.add("# Ofertas pendentes");
+        for (var o : all) {
+            Kingdom from = core.kingdom(o.from);
+            out.add("#" + o.number + " " + (from == null ? "?" : from.name) + ": " + core.diplomacy().describe(o) + (o.message.isBlank() ? "" : " — «" + o.message + "»")
+                    + " (vale até o dia " + (o.expiresTick / 24000 + 1) + ")");
+        }
+        out.add("Responda com /k offer accept <n> ou /k offer refuse <n>.");
+    }
+
+    private void offer(Kingdom k, String[] a, List<String> out) {
+        if (a.length < 3) {
+            out.add("Uso: offer accept <n> | offer refuse <n> (veja /k offers)");
+            return;
+        }
+        int n;
+        try {
+            n = Integer.parseInt(a[2].replace("#", ""));
+        } catch (NumberFormatException e) {
+            out.add("✗ Número de oferta inválido: " + a[2]);
+            return;
+        }
+        boolean accept = a[1].equalsIgnoreCase("accept") || a[1].equalsIgnoreCase("aceitar");
+        boolean refuse = a[1].equalsIgnoreCase("refuse") || a[1].equalsIgnoreCase("recusar");
+        if (!accept && !refuse) {
+            out.add("Uso: offer accept <n> | offer refuse <n>");
+            return;
+        }
+        String why = accept ? core.diplomacy().acceptOffer(k, n) : core.diplomacy().refuseOffer(k, n);
+        out.add(why == null ? (accept ? "✓ Oferta #" + n + " aceita." : "✓ Oferta #" + n + " recusada.") : "✗ " + why);
     }
 
     private void petitions(Kingdom k, List<String> out) {

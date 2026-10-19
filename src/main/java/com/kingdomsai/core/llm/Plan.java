@@ -5,8 +5,14 @@ import com.kingdomsai.core.action.ActionType;
 
 import java.util.*;
 
-/** Saída estruturada da LLM: uma fala + ações primitivas propostas (ainda não validadas). */
-public record Plan(String reply, List<PlannedAction> actions) {
+/**
+ * Saída estruturada da LLM: uma fala + ações primitivas propostas (ainda não validadas).
+ * {@code extra} guarda os outros campos de texto do objeto (decision, stance, reason... do rei rival).
+ */
+public record Plan(String reply, List<PlannedAction> actions, Map<String, String> extra) {
+    public Plan(String reply, List<PlannedAction> actions) {
+        this(reply, actions, Map.of());
+    }
 
     public record PlannedAction(ActionType type, String rawType, Map<String, String> params) {}
 
@@ -19,7 +25,11 @@ public record Plan(String reply, List<PlannedAction> actions) {
         int end = raw.lastIndexOf('}');
         if (start < 0 || end <= start) throw new JsonParseException("sem objeto JSON");
         JsonObject o = JsonParser.parseString(raw.substring(start, end + 1)).getAsJsonObject();
-        String reply = o.has("reply") && !o.get("reply").isJsonNull() ? o.get("reply").getAsString() : "";
+        String reply = o.has("reply") && !o.get("reply").isJsonNull() ? o.get("reply").getAsString()
+                : o.has("message_to_target") && o.get("message_to_target").isJsonPrimitive() ? o.get("message_to_target").getAsString() : "";
+        Map<String, String> extra = new LinkedHashMap<>();
+        for (var f : o.entrySet())
+            if (!f.getKey().equals("reply") && !f.getKey().equals("actions") && f.getValue().isJsonPrimitive()) extra.put(f.getKey(), f.getValue().getAsString());
         List<PlannedAction> actions = new ArrayList<>();
         if (o.has("actions") && o.get("actions").isJsonArray()) {
             for (JsonElement e : o.getAsJsonArray("actions")) {
@@ -33,7 +43,7 @@ public record Plan(String reply, List<PlannedAction> actions) {
                 actions.add(new PlannedAction(ActionType.parse(type), type, params));
             }
         }
-        return new Plan(reply, actions);
+        return new Plan(reply, actions, extra);
     }
 
     public String toJson() {

@@ -58,6 +58,7 @@ public final class KingdomsCore {
     private final PopulationSystem population;
     private final DiplomacySystem diplomacy;
     private final KingdomDirector director;
+    private final com.kingdomsai.core.ai.RivalCouncil rivals;
     private final NpcScheduler scheduler;
     private final Advisor advisor;
     private final ContextBuilder contextBuilder;
@@ -92,6 +93,7 @@ public final class KingdomsCore {
         this.population = new PopulationSystem(this);
         this.diplomacy = new DiplomacySystem(this);
         this.director = new KingdomDirector(this);
+        this.rivals = new com.kingdomsai.core.ai.RivalCouncil(this);
         this.scheduler = new NpcScheduler(this);
         this.advisor = new Advisor(this);
         this.contextBuilder = new ContextBuilder(this);
@@ -208,7 +210,10 @@ public final class KingdomsCore {
             population.strategicTick();
             warfare.strategicTick();
             if (config.diplomacyEnabled) diplomacy.tick();
-            if (config.aiKingdomsEnabled) director.tick();
+            if (config.aiKingdomsEnabled) {
+                director.tick();
+                rivals.tick(); // conselho LLM dos reis rivais: raro, por evento (sem IA ao vivo não faz nada)
+            }
             opening.tick(); // roteiro de início dos reinos dos jogadores
         }
         bus.dispatch();
@@ -464,6 +469,10 @@ public final class KingdomsCore {
 
     public KingdomDirector director() {
         return director;
+    }
+
+    public com.kingdomsai.core.ai.RivalCouncil rivals() {
+        return rivals;
     }
 
     public NpcScheduler scheduler() {
