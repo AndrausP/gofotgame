@@ -90,6 +90,56 @@ public final class BridgeSelfTest {
             System.out.println("   distância média ao chamado: " + (int) first + " → " + (int) last);
             check("súditos se aproximam de quem chamou", last < first - 10 || last < 12);
 
+            // ---- F2.1: painel de IA pela ponte (provider falso, sem abrir o claude de verdade)
+            java.nio.file.Path iaDir = java.nio.file.Files.createTempDirectory("kai-ia");
+            bridge.ai().setSaveDir(iaDir);
+            ClaudeCodeSelfTest.FakeClaude fake = new ClaudeCodeSelfTest.FakeClaude("{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,"
+                    + "\"result\":\"{\\\"reply\\\":\\\"ok\\\",\\\"actions\\\":[]}\",\"total_cost_usd\":0.002,\"usage\":{\"input_tokens\":10,\"output_tokens\":5}}");
+            bridge.core().llm().setClaudeCodeProvider(new com.kingdomsai.core.llm.ClaudeCodeProvider(fake, false, java.nio.file.Files.createTempDirectory("kai-ia-work"), 300));
+            bridge.ai().setLoginOpener(cfg -> "✓ janela de login aberta (falsa)");
+
+            send(out, "{\"op\":\"ai_status\"}");
+            JsonObject ai = next(in, "ai_status");
+            check("F2.1: ai_status começa nas regras, com a lista de providers e o livro-caixa", ai.get("provider").getAsString().equals("mock")
+                    && ai.getAsJsonArray("providers").size() >= 3 && ai.getAsJsonObject("ledger").get("calls").getAsInt() == 0
+                    && !ai.get("live").getAsBoolean());
+
+            send(out, "{\"op\":\"ai_config\",\"provider\":\"claude_code\",\"npc_model\":\"haiku\",\"council_model\":\"sonnet\",\"budget_usd\":0.5,\"calls_per_minute\":12}");
+            ai = next(in, "ai_status");
+            check("F2.1: ai_config troca para Claude com os modelos e o teto", ai.get("ok").getAsBoolean() && ai.get("provider").getAsString().equals("claude_code")
+                    && ai.get("npc_model").getAsString().equals("haiku") && ai.get("council_model").getAsString().equals("sonnet")
+                    && ai.get("budget_usd").getAsDouble() == 0.5 && ai.get("calls_per_minute").getAsInt() == 12 && ai.get("live").getAsBoolean());
+            check("F2.1: a configuração foi para ia.json (sem chave de API)", java.nio.file.Files.readString(iaDir.resolve("ia.json")).contains("claude_code")
+                    && !java.nio.file.Files.readString(iaDir.resolve("ia.json")).toLowerCase().contains("apikey"));
+            com.kingdomsai.core.llm.LlmConfig reloaded = new com.kingdomsai.core.llm.LlmConfig();
+            reloaded.provider = "mock";
+            check("F2.1: ia.json volta a configurar a próxima sessão", com.kingdomsai.bridge.AiPanel.loadInto(iaDir, reloaded) && reloaded.isClaudeCode()
+                    && reloaded.claudeNpcModel.equals("haiku") && reloaded.budgetUsd == 0.5);
+
+            for (String bad : new String[]{"{\"provider\":\"evil\"}", "{\"npc_model\":\"haiku&calc\"}", "{\"council_model\":\"gpt-9\"}", "{\"budget_usd\":1000}",
+                    "{\"endpoint\":\"file:///etc/passwd\"}", "{\"calls_per_minute\":0}", "{\"effort\":\"turbo\"}"}) {
+                send(out, "{\"op\":\"ai_config\"," + bad.substring(1));
+                JsonObject r = next(in, "ai_status");
+                check("F2.1: ai_config recusa " + bad, !r.get("ok").getAsBoolean() && r.has("error") && r.get("provider").getAsString().equals("claude_code")
+                        && r.get("budget_usd").getAsDouble() == 0.5);
+            }
+
+            send(out, "{\"op\":\"ai_test\"}");
+            JsonObject tst = next(in, "ai_test");
+            check("F2.1: ai_test responde quando termina (JSON válido do provider falso)", tst.get("ok").getAsBoolean() && tst.get("text").getAsString().startsWith("✓"));
+            send(out, "{\"op\":\"ai_status\"}");
+            ai = next(in, "ai_status");
+            check("F2.1: o teste entra no livro-caixa e no status", ai.getAsJsonObject("ledger").get("calls").getAsInt() >= 1
+                    && ai.getAsJsonObject("ledger").get("cost_usd").getAsDouble() > 0 && ai.get("last_test").getAsString().startsWith("✓"));
+
+            send(out, "{\"op\":\"ai_login\"}");
+            check("F2.1: ai_login abre o login (conexão local)", next(in, "ai_login").get("text").getAsString().contains("aberta"));
+            check("F2.1: ai_login recusa quem não vem de 127.0.0.1", bridge.ai().login(false).startsWith("✗"));
+
+            send(out, "{\"op\":\"ai_config\",\"provider\":\"mock\"}");
+            ai = next(in, "ai_status");
+            check("F2.1: voltar para Regras desliga a IA", ai.get("ok").getAsBoolean() && ai.get("provider").getAsString().equals("mock") && !ai.get("live").getAsBoolean());
+
             send(out, "nao é json");
             check("JSON inválido não derruba a ponte", next(in, "error").getAsJsonArray("lines").size() == 1);
         } finally {

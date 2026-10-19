@@ -16,6 +16,11 @@ import java.nio.file.Path;
  * Com --save, carrega o jogo da pasta se existir e salva sozinho a cada ~5 minutos de jogo (e ao encerrar com Ctrl+C).
  */
 public final class BridgeMain {
+    private static boolean hasArg(String[] args, String name) {
+        for (String a : args) if (a.equals(name)) return true;
+        return false;
+    }
+
     /** Teto de gasto por sessão quando o provider é o Claude Code e nada foi pedido. */
     public static final double DEFAULT_CLAUDE_BUDGET_USD = 1.0;
 
@@ -104,6 +109,8 @@ public final class BridgeMain {
             state.tick = startTick;
             host = new VoxelHost(seed, state, cfg);
         }
+        if (save != null && !hasArg(args, "--llm") && AiPanel.loadInto(save, llm))
+            System.out.println("bridge: IA carregada de " + save.resolve(AiPanel.FILE));
         host.core.llm().configure(llm);
         BridgeServer bridge = new BridgeServer(host);
         if (fresh && !empty) bridge.found(name);

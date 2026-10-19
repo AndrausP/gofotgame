@@ -46,10 +46,14 @@ var stock_label: Label
 var info_label: Label
 var log_box: RichTextLabel
 var input: LineEdit
+var ai_panel: AiPanel
+var ai_label: Label
+var ai_flash := 0.0
 var mode_buttons := {}
 
 var smoke := false
 var smoke_stage := 0
+var smoke_people := ""
 var smoke_start := 0.0
 var shot_path := ""
 var shot_at := 0.0
@@ -80,6 +84,11 @@ func _ready() -> void:
 	bridge.chunk.connect(_on_chunk)
 	bridge.blocks.connect(_on_blocks)
 	bridge.fx.connect(_on_fx)
+	ai_panel.setup(bridge)
+	if "--ai-panel" in args:
+		ai_panel.toggle()
+	ai_panel.fallback_seen.connect(func(_n): ai_flash = 12.0)
+	bridge.ai.connect(_on_ai_status)
 	bridge.connection_changed.connect(_on_connection)
 
 
@@ -275,6 +284,9 @@ func _build_ui() -> void:
 	th.add_child(realm_label)
 	clock_label = Label.new()
 	th.add_child(clock_label)
+	ai_label = Label.new()
+	ai_label.add_theme_color_override("font_color", Color(0.65, 0.78, 1.0))
+	th.add_child(ai_label)
 	stock_label = Label.new()
 	stock_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -316,6 +328,15 @@ func _build_ui() -> void:
 	for tdef in [["Chuva", "rain"], ["Sol", "clear"], ["Fogo", "ignite"], ["Boom", "explode"], ["Água", "water"]]:
 		var kind: String = tdef[1]
 		wr.add_child(_button(tdef[0], func(): _tool(kind)))
+
+	sv.add_child(_section("IA"))
+	sv.add_child(_button("Painel de IA", func(): ai_panel.toggle()))
+	ai_panel = AiPanel.new()
+	ai_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	ai_panel.offset_top = 372
+	ai_panel.offset_right = -10
+	ai_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	root.add_child(ai_panel)
 
 	# baixo à esquerda: seleção, log e comando
 	var bottom := PanelContainer.new()
@@ -626,6 +647,19 @@ func _on_state(msg: Dictionary) -> void:
 		_smoke_step(msg)
 
 
+func _on_ai_status(msg: Dictionary) -> void:
+	if str(msg.get("op", "")) != "ai_status":
+		return
+	var label := str(msg.get("provider", "mock"))
+	for p in msg.get("providers", []):
+		if str(p.id) == label:
+			label = str(p.label)
+	var s := "IA: " + label
+	if not msg.get("live", false) and str(msg.get("provider", "mock")) != "mock":
+		s += " (fora do ar, usando regras)"
+	ai_label.text = s + ("   ⚠ falas pelas regras" if ai_flash > 0.0 else "")
+
+
 func _update_hud(msg: Dictionary) -> void:
 	var hh := int(game_time / 1000.0 + 6.0) % 24
 	var mm := int(fmod(game_time, 1000.0) / 1000.0 * 60.0)
@@ -704,6 +738,10 @@ func _apply_time(t: float) -> void:
 # ---- laço
 
 func _process(delta: float) -> void:
+	if ai_flash > 0.0:
+		ai_flash -= delta
+		if ai_flash <= 0.0 and ai_panel.status.size() > 0:
+			_on_ai_status(ai_panel.status)
 	_feed_chunks(6.0)
 	if shot_path != "" and chunks_loaded.size() >= 100 and chunk_queue.size() == 0:
 		shot_at += delta
@@ -877,5 +915,18 @@ func _smoke_step(msg: Dictionary) -> void:
 			n += 1
 		var avg := sum / maxf(1.0, n)
 		if avg < 12.0:
-			print("SMOKE OK: %d súditos, distância média %.1f, %d corpos em cena, %d chunks" % [n, avg, npc_nodes.size(), chunks_loaded.size()])
-			get_tree().quit(0)
+			smoke_people = "%d súditos, distância média %.1f, %d corpos em cena, %d chunks" % [n, avg, npc_nodes.size(), chunks_loaded.size()]
+			print("SMOKE povo: ", smoke_people)
+			smoke_stage = 2
+			ai_panel.toggle()          # abre o painel de IA e pede ai_status à ponte
+			return
+	if smoke_stage == 2 and ai_panel.status_count > 0:
+		var st: Dictionary = ai_panel.status
+		var led: Dictionary = st.get("ledger", {})
+		var ok: bool = ai_panel.visible and st.get("provider", "") == "mock" and st.get("providers", []).size() >= 3 and led.has("calls") 				and ai_panel.provider_id() == "mock" and AiPanel.footer_text(led, "").contains("nenhuma")
+		print("SMOKE painel de IA: provider=%s, providers=%d -> %s" % [st.get("provider", "?"), st.get("providers", []).size(), ok])
+		if not ok:
+			get_tree().quit(1)
+			return
+		print("SMOKE OK: ", smoke_people, " · IA ", st.get("provider", ""))
+		get_tree().quit(0)

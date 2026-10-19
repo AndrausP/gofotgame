@@ -212,7 +212,7 @@ flowchart TD
 
 ---
 
-### F2 — Painel de IA no Godot
+### F2 — Painel de IA no Godot — **Feita**
 
 **Objetivo:** configurar e acompanhar a IA sem editar variáveis de ambiente.
 

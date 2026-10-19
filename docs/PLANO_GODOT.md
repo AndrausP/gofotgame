@@ -7,6 +7,7 @@ Objetivo: um jogo próprio, no Godot, onde uma sociedade de NPCs movidos por reg
 Roteiro de implementação por fases em `docs/PLANO_IMPLEMENTACAO.md` (F0–F8). Fases feitas:
 
 - **F0 — Build e testes confiáveis: Feita** (Gradle, `jogar.sh`, semente reproduzível `-Dkingdoms.seed`, `CLAUDE.md`).
+- **F2 — Painel de IA no Godot: Feita** (ops `ai_*` na ponte, `godot/ai_panel.gd`, smoke cobre o painel).
 - **F1 — Claude Code como provider de primeira classe: Feita** (modelo por finalidade, `--json-schema`, custo/teto, textos sem Minecraft, teste de injeção).
 
 ## 1. Decisão principal: o que fazer com o Core

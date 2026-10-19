@@ -8,6 +8,7 @@ signal lines(msg: Dictionary)
 signal chunk(msg: Dictionary)
 signal blocks(msg: Dictionary)
 signal fx(msg: Dictionary)
+signal ai(msg: Dictionary)
 signal connection_changed(connected: bool)
 
 var host := "127.0.0.1"
@@ -83,4 +84,5 @@ func _dispatch(msg: Dictionary) -> void:
 		"chunk": chunk.emit(msg)
 		"blocks": blocks.emit(msg)
 		"fx": fx.emit(msg)
+		"ai_status", "ai_test", "ai_login": ai.emit(msg)
 		"reply", "async", "error": lines.emit(msg)

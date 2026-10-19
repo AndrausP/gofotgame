@@ -73,4 +73,29 @@ public final class LlmConfig {
     }
 
     public LlmConfig() {}
+
+    /** Cópia rasa (todos os campos são primitivos ou String). */
+    public LlmConfig copy() {
+        LlmConfig c = new LlmConfig();
+        c.enabled = enabled;
+        c.provider = provider;
+        c.model = model;
+        c.npcModel = npcModel;
+        c.endpoint = endpoint;
+        c.apiKey = apiKey;
+        c.temperature = temperature;
+        c.maxContextChars = maxContextChars;
+        c.timeoutMs = timeoutMs;
+        c.maxRetries = maxRetries;
+        c.maxCallsPerMinute = maxCallsPerMinute;
+        c.fallbackToRules = fallbackToRules;
+        c.claudeCommand = claudeCommand;
+        c.claudeNpcModel = claudeNpcModel;
+        c.claudeCouncilModel = claudeCouncilModel;
+        c.claudeEffort = claudeEffort;
+        c.budgetUsd = budgetUsd;
+        c.claudeCallBudgetNpcUsd = claudeCallBudgetNpcUsd;
+        c.claudeCallBudgetCouncilUsd = claudeCallBudgetCouncilUsd;
+        return c;
+    }
 }

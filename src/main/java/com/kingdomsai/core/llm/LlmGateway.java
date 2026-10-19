@@ -109,6 +109,10 @@ public final class LlmGateway {
         });
     }
 
+    public String lastError() {
+        return lastError;
+    }
+
     public String lastPrompt() {
         return lastPrompt;
     }

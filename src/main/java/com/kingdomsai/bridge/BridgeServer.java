@@ -28,8 +28,9 @@ import java.util.zip.GZIPOutputStream;
  *
  * Cliente → servidor: cmd {line} · player {x,y,z} · view {x,z,r} (chunks ao redor) · call_all · speed {mult}
  *                     break {x,y,z} · place {x,y,z,block}
+ *                     ai_status · ai_config {provider,npc_model,council_model,budget_usd,calls_per_minute,endpoint,effort} · ai_test · ai_login
  * Servidor → cliente: hello (tabela de blocos) · chunk {cx,cz,d} · blocks {b:[[x,y,z,id]...]} · state (~4 Hz)
- *                     fx {...} · reply/async/error {lines}
+ *                     fx {...} · reply/async/error {lines} · ai_status/ai_test/ai_login (respostas do painel de IA)
  *
  * O Core é de uma thread só: leitores de socket só enfileiram; quem executa é o laço de tick.
  */
@@ -40,6 +41,7 @@ public final class BridgeServer {
     private final Gson gson = new Gson();
     private final VoxelHost host;
     private final CommandService cli;
+    private final AiPanel ai;
     private final UUID player = UUID.fromString("00000000-0000-0000-0000-00000000a11d");
     private final String playerName = "Andraus";
     private final Queue<Runnable> inbox = new ConcurrentLinkedQueue<>();
@@ -60,6 +62,7 @@ public final class BridgeServer {
         this.host = host;
         host.core.setMainThread(inbox::add);
         cli = new CommandService(host.core);
+        ai = new AiPanel(host.core);
         cli.setNotifier((p, lines) -> broadcast(lines("async", lines)));
         host.physical.onFx(f -> {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -77,6 +80,7 @@ public final class BridgeServer {
 
     public void setAutosave(java.nio.file.Path dir, long everyTicks) {
         saveDir = dir;
+        ai.setSaveDir(dir);
         autosaveEvery = everyTicks;
     }
 
@@ -91,6 +95,10 @@ public final class BridgeServer {
 
     public KingdomsCore core() {
         return host.core;
+    }
+
+    public AiPanel ai() {
+        return ai;
     }
 
     public CommandService cli() {
@@ -232,6 +240,21 @@ public final class BridgeServer {
             }
             case "view" -> c.setView(msg.get("x").getAsInt(), msg.get("z").getAsInt(), msg.get("r").getAsInt());
             case "call_all" -> c.send(lines("reply", callAll()));
+            case "ai_status" -> c.send(ai.status());
+            case "ai_config" -> c.send(ai.configure(msg));
+            case "ai_test" -> ai.test().whenComplete((r, err) -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("op", "ai_test");
+                m.put("text", err == null ? r : "✗ " + err.getMessage());
+                m.put("ok", err == null && r != null && r.startsWith("✓"));
+                inbox.add(() -> c.send(m)); // a resposta chega depois: volta pela thread do laço
+            });
+            case "ai_login" -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("op", "ai_login");
+                m.put("text", ai.login(c.isLoopback()));
+                c.send(m);
+            }
             case "speed" -> speed = Math.max(1, Math.min(20, msg.get("mult").getAsInt()));
             case "break" -> c.send(lines("reply", playerBreak(new Pos(msg.get("x").getAsInt(), msg.get("y").getAsInt(), msg.get("z").getAsInt()))));
             case "place" -> c.send(lines("reply", playerPlace(new Pos(msg.get("x").getAsInt(), msg.get("y").getAsInt(), msg.get("z").getAsInt()),
@@ -518,6 +541,10 @@ public final class BridgeServer {
 
         void send(Map<String, Object> msg) {
             sendRaw(gson.toJson(msg));
+        }
+
+        boolean isLoopback() {
+            return socket.getInetAddress() != null && socket.getInetAddress().isLoopbackAddress();
         }
 
         synchronized void sendRaw(String json) {

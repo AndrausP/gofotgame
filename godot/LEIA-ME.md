@@ -16,8 +16,8 @@ WASD move o marcador do rei · Q/E ou botão direito gira · roda do mouse aprox
 
 ## Protocolo
 
-Cliente → servidor: `cmd {line}` · `player {x,y,z}` · `view {x,z,r}` · `call_all` · `speed {mult}` · `break {x,y,z}` · `place {x,y,z,block}` · `weather {w}` · `ignite` · `explode {x,y,z,r}` · `water`.
-Servidor → cliente: `hello` (tabela de blocos, spawn) · `chunk {cx,cz,d}` (16×16×128, 16 bits, gzip+base64, já na ordem do `VoxelBuffer`) · `blocks {b:[[x,y,z,id]]}` · `state` (~4 Hz: NPCs com corpo, obras, clima) · `fx` · `reply/async/error {lines}`.
+Cliente → servidor: `cmd {line}` · `player {x,y,z}` · `view {x,z,r}` · `call_all` · `speed {mult}` · `break {x,y,z}` · `place {x,y,z,block}` · `weather {w}` · `ignite` · `explode {x,y,z,r}` · `water` · `ai_status` · `ai_config {provider,npc_model,council_model,budget_usd,calls_per_minute,endpoint,effort}` · `ai_test` · `ai_login`.
+Servidor → cliente: `hello` (tabela de blocos, spawn) · `chunk {cx,cz,d}` (16×16×128, 16 bits, gzip+base64, já na ordem do `VoxelBuffer`) · `blocks {b:[[x,y,z,id]]}` · `state` (~4 Hz: NPCs com corpo, obras, clima) · `fx` · `reply/async/error {lines}` · `ai_status/ai_test/ai_login` (painel de IA: botão "Painel de IA" escolhe Regras/Claude/Ollama, modelos e teto de gasto; grava `ia.json` no save).
 
 ## Testes
 
